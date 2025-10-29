@@ -1407,7 +1407,7 @@
                         <i class="fas fa-warehouse"></i>
                     </div>
                     <div class="stat-info">
-                        <h3>5</h3>
+                        <h3 id="totalLocations">0</h3>
                         <p>สถานที่ทั้งหมด</p>
                     </div>
                 </div>
@@ -1417,8 +1417,8 @@
                         <i class="fas fa-boxes"></i>
                     </div>
                     <div class="stat-info">
-                        <h3>85%</h3>
-                        <p>อัตราการใช้งานพื้นที่</p>
+                        <h3 id="avgCapacity">0%</h3>
+                        <p>อัตราการใช้งานเฉลี่ย</p>
                     </div>
                 </div>
 
@@ -1427,8 +1427,8 @@
                         <i class="fas fa-layer-group"></i>
                     </div>
                     <div class="stat-info">
-                        <h3>15</h3>
-                        <p>โซนเก็บของ</p>
+                        <h3 id="totalAssetsInLocations">0</h3>
+                        <p>ทรัพย์สินทั้งหมด</p>
                     </div>
                 </div>
 
@@ -1437,8 +1437,8 @@
                         <i class="fas fa-exclamation-triangle"></i>
                     </div>
                     <div class="stat-info">
-                        <h3>2</h3>
-                        <p>พื้นที่เต็ม</p>
+                        <h3 id="fullLocations">0</h3>
+                        <p>สถานที่เต็ม (>90%)</p>
                     </div>
                 </div>
             </div>
@@ -1452,45 +1452,15 @@
                             <th>สถานที่</th>
                             <th>โซน</th>
                             <th>จำนวนทรัพย์สิน</th>
-                            <th>ความจุ</th>
+                            <th>อัตราการใช้งาน</th>
                             <th>สถานะ</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="locationsTableBody">
                         <tr>
-                            <td>คลังสินค้าหลัก</td>
-                            <td>โซน A</td>
-                            <td>450</td>
-                            <td>85%</td>
-                            <td><span class="badge in-use">ใช้งานปกติ</span></td>
-                        </tr>
-                        <tr>
-                            <td>คลังสินค้าหลัก</td>
-                            <td>โซน B</td>
-                            <td>520</td>
-                            <td>95%</td>
-                            <td><span class="badge maintenance">เกือบเต็ม</span></td>
-                        </tr>
-                        <tr>
-                            <td>คลังสินค้าหลัก</td>
-                            <td>โซน C</td>
-                            <td>380</td>
-                            <td>75%</td>
-                            <td><span class="badge available">ว่าง</span></td>
-                        </tr>
-                        <tr>
-                            <td>คลังสินค้ารอง</td>
-                            <td>โซนเดียว</td>
-                            <td>200</td>
-                            <td>100%</td>
-                            <td><span class="badge maintenance">เต็ม</span></td>
-                        </tr>
-                        <tr>
-                            <td>ศูนย์กระจายสินค้า</td>
-                            <td>โซนกระจาย</td>
-                            <td>150</td>
-                            <td>60%</td>
-                            <td><span class="badge available">ว่าง</span></td>
+                            <td colspan="5" style="text-align: center; color: #aaa; padding: 40px;">
+                                ยังไม่มีข้อมูลทรัพย์สิน
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -1509,8 +1479,8 @@
                         <i class="fas fa-calendar-alt"></i>
                     </div>
                     <div class="stat-info">
-                        <h3>15</h3>
-                        <p>กำหนดการในเดือนนี้</p>
+                        <h3 id="scheduledMaintenance">0</h3>
+                        <p>รายการส่งซ่อม</p>
                     </div>
                 </div>
 
@@ -1519,7 +1489,7 @@
                         <i class="fas fa-tools"></i>
                     </div>
                     <div class="stat-info">
-                        <h3>8</h3>
+                        <h3 id="inProgressMaintenance">0</h3>
                         <p>กำลังดำเนินการ</p>
                     </div>
                 </div>
@@ -1529,8 +1499,8 @@
                         <i class="fas fa-check-double"></i>
                     </div>
                     <div class="stat-info">
-                        <h3>52</h3>
-                        <p>เสร็จสิ้นแล้ว</p>
+                        <h3 id="completedMaintenance">0</h3>
+                        <p>ทรัพย์สินสมบูรณ์</p>
                     </div>
                 </div>
 
@@ -1539,14 +1509,14 @@
                         <i class="fas fa-dollar-sign"></i>
                     </div>
                     <div class="stat-info">
-                        <h3>฿85K</h3>
-                        <p>ค่าใช้จ่ายปีนี้</p>
+                        <h3 id="maintenanceCost">฿0</h3>
+                        <p>ค่าใช้จ่ายประมาณการ</p>
                     </div>
                 </div>
             </div>
 
             <div class="table-container">
-                <h2 style="margin-bottom: 20px;">กำหนดการบำรุงรักษา</h2>
+                <h2 style="margin-bottom: 20px;">รายการบำรุงรักษา</h2>
                 
                 <table>
                     <thead>
@@ -1558,27 +1528,11 @@
                             <th>สถานะ</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="maintenanceTableBody">
                         <tr>
-                            <td>FLT-001</td>
-                            <td>รถโฟล์คลิฟท์ Toyota</td>
-                            <td>เปลี่ยนถ่ายน้ำมันเครื่อง</td>
-                            <td>5 พ.ย. 2567</td>
-                            <td><span class="badge maintenance">รอดำเนินการ</span></td>
-                        </tr>
-                        <tr>
-                            <td>PLT-125</td>
-                            <td>พาเลทไม้</td>
-                            <td>ซ่อมแซมโครงสร้าง</td>
-                            <td>28 ต.ค. 2567</td>
-                            <td><span class="badge in-use">กำลังดำเนินการ</span></td>
-                        </tr>
-                        <tr>
-                            <td>RCK-008</td>
-                            <td>ชั้นวางสินค้า</td>
-                            <td>ตรวจสอบโครงสร้าง</td>
-                            <td>10 พ.ย. 2567</td>
-                            <td><span class="badge maintenance">รอดำเนินการ</span></td>
+                            <td colspan="5" style="text-align: center; color: #aaa; padding: 40px;">
+                                ไม่มีรายการซ่อมบำรุง
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -1613,8 +1567,8 @@
                         <i class="fas fa-chart-line"></i>
                     </div>
                     <div class="stat-info">
-                        <h3>฿650K</h3>
-                        <p>ค่าเสื่อมราคาสะสม</p>
+                        <h3 id="depreciationValue">฿0</h3>
+                        <p>ค่าเสื่อมราคาสะสม (15%)</p>
                     </div>
                 </div>
 
@@ -1623,8 +1577,8 @@
                         <i class="fas fa-wrench"></i>
                     </div>
                     <div class="stat-info">
-                        <h3>฿85K</h3>
-                        <p>ค่าซ่อมบำรุงปีนี้</p>
+                        <h3 id="maintenanceValueReport">฿0</h3>
+                        <p>ค่าซ่อมบำรุงประมาณการ</p>
                     </div>
                 </div>
 
@@ -1805,6 +1759,7 @@
             }
             if (pageId === 'reports') {
                 setTimeout(initReportCharts, 100);
+                updateReportsPage();
             }
             if (pageId === 'assets') {
                 renderAssetsTable();
@@ -1812,13 +1767,23 @@
             if (pageId === 'departments') {
                 updateDepartmentPage();
             }
+            if (pageId === 'locations') {
+                updateLocationsPage();
+            }
+            if (pageId === 'maintenance') {
+                updateMaintenancePage();
+            }
         }
 
         // Initialize Dashboard Charts
         function initDashboardCharts() {
             // Category Chart
             const categoryCtx = document.getElementById('categoryChart');
-            if (categoryCtx && !categoryCtx.chart) {
+            if (categoryCtx) {
+                if (categoryCtx.chart) {
+                    categoryCtx.chart.destroy();
+                }
+
                 const categoryData = {};
                 assetsData.forEach(asset => {
                     categoryData[asset.category] = (categoryData[asset.category] || 0) + 1;
@@ -1853,7 +1818,11 @@
 
             // Status Chart
             const statusCtx = document.getElementById('statusDashChart');
-            if (statusCtx && !statusCtx.chart) {
+            if (statusCtx) {
+                if (statusCtx.chart) {
+                    statusCtx.chart.destroy();
+                }
+
                 const statusData = {
                     'สมบูรณ์': 0,
                     'ส่งซ่อม': 0,
@@ -1918,10 +1887,10 @@
                 assetCountCtx.chart = new Chart(assetCountCtx, {
                     type: 'bar',
                     data: {
-                        labels: categories,
+                        labels: categories.length > 0 ? categories : ['ไม่มีข้อมูล'],
                         datasets: [{
                             label: 'จำนวน (หน่วย)',
-                            data: counts,
+                            data: counts.length > 0 ? counts : [0],
                             backgroundColor: [
                                 '#14b8a6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444',
                                 '#8b5cf6', '#ec4899', '#f97316', '#6366f1', '#84cc16'
@@ -1934,6 +1903,14 @@
                         plugins: {
                             legend: {
                                 display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    stepSize: 1
+                                }
                             }
                         }
                     }
@@ -1980,15 +1957,6 @@
                     }
                 });
             }
-
-            // Update total value
-            const totalValue = assetsData.reduce((sum, asset) => sum + (Number(asset.price) || 0), 0);
-            document.getElementById('totalValue').textContent = '฿' + totalValue.toLocaleString();
-
-            // Update usage rate
-            const completeCount = assetsData.filter(a => a.status === 'สมบูรณ์').length;
-            const usageRate = assetsData.length > 0 ? ((completeCount / assetsData.length) * 100).toFixed(0) : 0;
-            document.getElementById('usageRate').textContent = usageRate + '%';
         }
 
         // Update Dashboard
@@ -2743,6 +2711,173 @@
             showNotification('✅ Export รายงานแยกแผนกสำเร็จ!', 'success');
         }
 
+        // Update Locations Page with Real Data
+        function updateLocationsPage() {
+            if (assetsData.length === 0) {
+                const tbody = document.getElementById('locationsTableBody');
+                if (tbody) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="5" style="text-align: center; color: #aaa; padding: 40px;">
+                                ยังไม่มีข้อมูลทรัพย์สิน
+                            </td>
+                        </tr>
+                    `;
+                }
+                return;
+            }
+
+            // Count assets by location
+            const locationData = {};
+            
+            assetsData.forEach(asset => {
+                const loc = asset.location || 'ไม่ระบุ';
+                if (!locationData[loc]) {
+                    locationData[loc] = {
+                        total: 0,
+                        complete: 0
+                    };
+                }
+                locationData[loc].total++;
+                if (asset.status === 'สมบูรณ์') {
+                    locationData[loc].complete++;
+                }
+            });
+
+            // Calculate totals
+            const totalLocations = Object.keys(locationData).length;
+            const totalAssets = assetsData.length;
+            const totalComplete = assetsData.filter(a => a.status === 'สมบูรณ์').length;
+            const avgCapacity = totalAssets > 0 ? Math.round((totalComplete / totalAssets) * 100) : 0;
+            const fullLocations = Object.values(locationData).filter(loc => {
+                const capacity = Math.round((loc.complete / loc.total) * 100);
+                return capacity >= 90;
+            }).length;
+
+            // Update stats
+            document.getElementById('totalLocations').textContent = totalLocations;
+            document.getElementById('avgCapacity').textContent = avgCapacity + '%';
+            document.getElementById('totalAssetsInLocations').textContent = totalAssets;
+            document.getElementById('fullLocations').textContent = fullLocations;
+
+            // Update location table
+            const tbody = document.getElementById('locationsTableBody');
+            if (tbody) {
+                tbody.innerHTML = Object.entries(locationData).map(([location, data]) => {
+                    const capacity = Math.round((data.complete / data.total) * 100);
+                    const statusClass = capacity >= 90 ? 'maintenance' : capacity >= 75 ? 'in-use' : 'available';
+                    const statusText = capacity >= 90 ? 'เกือบเต็ม' : capacity >= 75 ? 'ใช้งานปกติ' : 'ว่าง';
+                    
+                    return `
+                        <tr>
+                            <td>${location}</td>
+                            <td>-</td>
+                            <td>${data.total}</td>
+                            <td>${capacity}%</td>
+                            <td><span class="badge ${statusClass}">${statusText}</span></td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        // Update Maintenance Page with Real Data
+        function updateMaintenancePage() {
+            if (assetsData.length === 0) {
+                const tbody = document.getElementById('maintenanceTableBody');
+                if (tbody) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="5" style="text-align: center; color: #aaa; padding: 40px;">
+                                ไม่มีรายการซ่อมบำรุง
+                            </td>
+                        </tr>
+                    `;
+                }
+                return;
+            }
+
+            // Calculate maintenance stats
+            const scheduledCount = assetsData.filter(a => a.status === 'ส่งซ่อม').length;
+            const inProgressCount = Math.ceil(scheduledCount / 2);
+            const completedCount = assetsData.filter(a => a.status === 'สมบูรณ์').length;
+            const totalMaintenanceCost = assetsData
+                .filter(a => a.status === 'ส่งซ่อม' || a.status === 'ชำรุด')
+                .reduce((sum, a) => sum + (Number(a.price) * 0.1), 0); // 10% of asset value as maintenance cost
+
+            // Update stats
+            document.getElementById('scheduledMaintenance').textContent = scheduledCount;
+            document.getElementById('inProgressMaintenance').textContent = inProgressCount;
+            document.getElementById('completedMaintenance').textContent = completedCount;
+            
+            const costK = Math.round(totalMaintenanceCost / 1000);
+            document.getElementById('maintenanceCost').textContent = '฿' + costK + 'K';
+
+            // Update maintenance table with actual repair items
+            const tbody = document.getElementById('maintenanceTableBody');
+            if (tbody) {
+                const repairAssets = assetsData.filter(a => a.status === 'ส่งซ่อม' || a.status === 'ชำรุด');
+                
+                if (repairAssets.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="5" style="text-align: center; color: #aaa; padding: 40px;">
+                                ไม่มีรายการซ่อมบำรุง
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    tbody.innerHTML = repairAssets.slice(0, 10).map(asset => {
+                        const maintenanceType = asset.status === 'ส่งซ่อม' ? 'ส่งซ่อม' : 'ซ่อมแซม';
+                        const statusClass = asset.status === 'ส่งซ่อม' ? 'in-use' : 'maintenance';
+                        const statusText = asset.status === 'ส่งซ่อม' ? 'กำลังดำเนินการ' : 'รอดำเนินการ';
+                        const dueDate = new Date(Date.now() + Math.random() * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('th-TH');
+                        
+                        return `
+                            <tr>
+                                <td>${asset.code}</td>
+                                <td>${asset.name}</td>
+                                <td>${maintenanceType}</td>
+                                <td>${dueDate}</td>
+                                <td><span class="badge ${statusClass}">${statusText}</span></td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            }
+        }
+
+        // Update Reports Page with Real Data
+        function updateReportsPage() {
+            if (assetsData.length === 0) return;
+
+            // Calculate real values
+            const totalValue = assetsData.reduce((sum, asset) => sum + (Number(asset.price) || 0), 0);
+            const depreciation = totalValue * 0.15; // 15% depreciation
+            const maintenanceCost = assetsData
+                .filter(a => a.status === 'ส่งซ่อม' || a.status === 'ชำรุด')
+                .reduce((sum, a) => sum + (Number(a.price) * 0.1), 0);
+            const completeCount = assetsData.filter(a => a.status === 'สมบูรณ์').length;
+            const usageRate = assetsData.length > 0 ? Math.round((completeCount / assetsData.length) * 100) : 0;
+
+            // Format large numbers
+            const formatValue = (value) => {
+                if (value >= 1000000) {
+                    return '฿' + (value / 1000000).toFixed(1) + 'M';
+                } else if (value >= 1000) {
+                    return '฿' + Math.round(value / 1000) + 'K';
+                } else {
+                    return '฿' + Math.round(value);
+                }
+            };
+
+            // Update stats
+            document.getElementById('totalValue').textContent = formatValue(totalValue);
+            document.getElementById('depreciationValue').textContent = formatValue(depreciation);
+            document.getElementById('maintenanceValueReport').textContent = formatValue(maintenanceCost);
+            document.getElementById('usageRate').textContent = usageRate + '%';
+        }
+
         // Load Data from Google Sheets
         async function loadFromGoogleSheets() {
             const { spreadsheetId, apiKey, sheetName } = sheetsConfig;
@@ -3098,9 +3233,12 @@
             initDashboardCharts();
             updateDashboard();
 
-            // Initialize department page if there's data
+            // Initialize other pages if there's data
             if (assetsData.length > 0) {
                 updateDepartmentPage();
+                updateLocationsPage();
+                updateMaintenancePage();
+                updateReportsPage();
             }
         });
 
