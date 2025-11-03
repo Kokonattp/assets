@@ -7,7 +7,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -1236,6 +1237,14 @@
                     </div>
 
                     <div class="form-group">
+                        <label>จำนวน (Quantity) <span class="required">*</span></label>
+                        <input type="number" id="newQuantity" placeholder="1" value="1" min="1" required>
+                        <small style="color: #666; display: block; margin-top: 5px;">
+                            <i class="fas fa-info-circle"></i> จำนวนชิ้น/หน่วยของทรัพย์สินนี้
+                        </small>
+                    </div>
+
+                    <div class="form-group">
                         <label>สถานที่เก็บ <span class="required">*</span></label>
                         <select id="newLocation" required>
                             <option value="">เลือกสถานที่</option>
@@ -2301,23 +2310,243 @@
         </div>
     </div>
 
-    <!-- QR Code Modal -->
-    <div id="qrModal" class="modal">
-        <div class="modal-content" style="max-width: 500px;">
+    <!-- Barcode Modal -->
+    <div id="barcodeModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
-                <h2><i class="fas fa-qrcode"></i> QR Code - ทรัพย์สิน</h2>
-                <button class="close-btn" onclick="closeModal('qrModal')">&times;</button>
+                <h2><i class="fas fa-barcode"></i> Barcode - ทรัพย์สิน</h2>
+                <button class="close-btn" onclick="closeModal('barcodeModal')">&times;</button>
             </div>
             <div class="modal-body" style="text-align: center;">
-                <h3 id="qrAssetName" style="color: var(--primary); margin-bottom: 10px;"></h3>
-                <p id="qrAssetCode" style="color: #666; margin-bottom: 20px;"></p>
-                <div id="qrcodeContainer" style="display: flex; justify-content: center; margin: 20px 0;"></div>
-                <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
-                    <button class="btn btn-primary" onclick="downloadQRCode()">
-                        <i class="fas fa-download"></i> ดาวน์โหลด QR Code
+                <h3 id="barcodeAssetName" style="color: var(--primary); margin-bottom: 10px;"></h3>
+                <p id="barcodeAssetCode" style="color: #666; margin-bottom: 20px; font-size: 18px; font-weight: 600;"></p>
+                <div style="display: flex; justify-content: center; margin: 30px 0;">
+                    <svg id="barcodeContainer"></svg>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap;">
+                    <button class="btn btn-primary" onclick="downloadBarcode()">
+                        <i class="fas fa-download"></i> ดาวน์โหลด
                     </button>
-                    <button class="btn btn-info" onclick="printQRCode()">
-                        <i class="fas fa-print"></i> พิมพ์ QR Code
+                    <button class="btn btn-info" onclick="printBarcode()">
+                        <i class="fas fa-print"></i> พิมพ์
+                    </button>
+                    <button class="btn btn-success" onclick="printBarcodeLabel()">
+                        <i class="fas fa-tag"></i> พิมพ์สติ๊กเกอร์
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scanner Modal -->
+    <div id="scannerModal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-camera"></i> แสกน Barcode</h2>
+                <button class="close-btn" onclick="closeScanner()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="scanner-container" style="width: 100%; height: 400px; background: #000; border-radius: 10px; position: relative; overflow: hidden;">
+                    <div id="scanner-placeholder" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: white;">
+                        <i class="fas fa-camera" style="font-size: 48px; margin-bottom: 10px;"></i>
+                        <p>กำลังเปิดกล้อง...</p>
+                    </div>
+                </div>
+                <div id="scanner-result" style="margin-top: 20px; padding: 15px; background: #f0f9ff; border-radius: 10px; display: none;">
+                    <h3 style="color: var(--primary); margin-bottom: 10px;">
+                        <i class="fas fa-check-circle"></i> พบทรัพย์สิน
+                    </h3>
+                    <div id="scanner-result-content"></div>
+                </div>
+                <div style="margin-top: 15px; text-align: center;">
+                    <button class="btn btn-secondary" onclick="closeScanner()">
+                        <i class="fas fa-times"></i> ปิด
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Asset Modal -->
+    <div id="editAssetModal" class="modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-edit"></i> แก้ไขทรัพย์สิน</h2>
+                <button class="close-btn" onclick="closeModal('editAssetModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editAssetCode">
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>รหัสทรัพย์สิน <span class="required">*</span></label>
+                        <input type="text" id="editCode" disabled style="background: #f5f5f5;">
+                    </div>
+
+                    <div class="form-group">
+                        <label>หมวดหมู่ <span class="required">*</span></label>
+                        <select id="editCategory" required>
+                            <option value="">เลือกหมวดหมู่</option>
+                            <option>พาเลท</option>
+                            <option>TOTE</option>
+                            <option>ตะแกรงกรง</option>
+                            <option>RF Scanner</option>
+                            <option>IData</option>
+                            <option>แบตเตอรี่ RF</option>
+                            <option>แบตเตอรี่ IData</option>
+                            <option>วิทยุสื่อสาร</option>
+                            <option>Cutter Safety</option>
+                            <option>รถโฟล์คลิฟท์</option>
+                            <option>ชั้นวางสินค้า</option>
+                            <option>อุปกรณ์คลัง</option>
+                            <option>เครื่องจักร</option>
+                            <option>อื่นๆ</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label>ชื่อทรัพย์สิน <span class="required">*</span></label>
+                        <input type="text" id="editName" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>ยี่ห้อ</label>
+                        <input type="text" id="editBrand">
+                    </div>
+
+                    <div class="form-group">
+                        <label>รุ่น</label>
+                        <input type="text" id="editModel">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Serial Number</label>
+                        <input type="text" id="editSerial">
+                    </div>
+
+                    <div class="form-group">
+                        <label>วันที่ซื้อ <span class="required">*</span></label>
+                        <input type="date" id="editPurchaseDate" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>ราคาซื้อ (฿) <span class="required">*</span></label>
+                        <input type="number" id="editPrice" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>จำนวน (Quantity) <span class="required">*</span></label>
+                        <input type="number" id="editQuantity" min="1" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>สถานที่เก็บ <span class="required">*</span></label>
+                        <select id="editLocation" required></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>แผนก</label>
+                        <select id="editDepartment">
+                            <option value="">เลือกแผนก</option>
+                            <option>สำรอง</option>
+                            <option>AC</option>
+                            <option>AP</option>
+                            <option>APB</option>
+                            <option>CF</option>
+                            <option>APL</option>
+                            <option>CP</option>
+                            <option>DP</option>
+                            <option>INV</option>
+                            <option>LS</option>
+                            <option>QA</option>
+                            <option>RC</option>
+                            <option>ST</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>สถานะ</label>
+                        <select id="editStatus">
+                            <option>สมบูรณ์</option>
+                            <option>ส่งซ่อม</option>
+                            <option>ชำรุด</option>
+                            <option>เสีย</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label>คำอธิบาย</label>
+                        <textarea id="editDescription"></textarea>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn btn-secondary" onclick="closeModal('editAssetModal')">
+                        <i class="fas fa-times"></i> ยกเลิก
+                    </button>
+                    <button class="btn btn-success" onclick="saveEditAsset()">
+                        <i class="fas fa-save"></i> บันทึกการแก้ไข
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cycle Count Modal -->
+    <div id="cycleCountModal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-repeat"></i> Cycle Count - นับสตอคแบบแบ่งส่วน</h2>
+                <button class="close-btn" onclick="closeModal('cycleCountModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: #666; margin-bottom: 20px;">
+                    <i class="fas fa-info-circle"></i> 
+                    Cycle Count คือการนับสตอคทีละส่วน ไม่ต้องนับทั้งหมดพร้อมกัน เหมาะสำหรับการตรวจนับเป็นประจำ
+                </p>
+
+                <div class="form-group">
+                    <label><strong>เลือกหมวดหมู่ที่จะนับ</strong></label>
+                    <select id="cycleCategory" multiple size="6" style="width: 100%; padding: 10px;">
+                        <option value="">ทั้งหมด</option>
+                        <option value="พาเลท">พาเลท</option>
+                        <option value="TOTE">TOTE</option>
+                        <option value="ตะแกรงกรง">ตะแกรงกรง</option>
+                        <option value="RF Scanner">RF Scanner</option>
+                        <option value="IData">IData</option>
+                        <option value="อื่นๆ">อื่นๆ</option>
+                    </select>
+                    <small style="color: #666;">กด Ctrl/Cmd เพื่อเลือกหลายรายการ</small>
+                </div>
+
+                <div class="form-group">
+                    <label><strong>เลือกสถานที่</strong></label>
+                    <select id="cycleLocation">
+                        <option value="">ทั้งหมด</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label><strong>ชื่อ Cycle นี้</strong></label>
+                    <input type="text" id="cycleName" placeholder="เช่น: นับพาเลทโซน A - เดือนมกราคม">
+                </div>
+
+                <div style="background: #f0f9ff; padding: 15px; border-radius: 10px; margin-top: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span>รายการที่จะนับ:</span>
+                        <strong id="cyclePreviewCount">0 รายการ</strong>
+                    </div>
+                    <button class="btn btn-info" onclick="previewCycleCount()" style="width: 100%;">
+                        <i class="fas fa-eye"></i> ดูตัวอย่าง
+                    </button>
+                </div>
+
+                <div class="form-actions" style="margin-top: 20px;">
+                    <button class="btn btn-secondary" onclick="closeModal('cycleCountModal')">
+                        <i class="fas fa-times"></i> ยกเลิก
+                    </button>
+                    <button class="btn btn-success" onclick="startCycleCount()">
+                        <i class="fas fa-play"></i> เริ่ม Cycle Count
                     </button>
                 </div>
             </div>
@@ -2853,6 +3082,7 @@
             const serial = document.getElementById('newSerial').value;
             const purchaseDate = document.getElementById('newPurchaseDate').value;
             const price = document.getElementById('newPrice').value;
+            const quantity = parseInt(document.getElementById('newQuantity').value) || 1;
             const location = document.getElementById('newLocation').value;
             const department = document.getElementById('newDepartment').value;
             const status = document.getElementById('newStatus').value;
@@ -2864,8 +3094,9 @@
             }
             
             const asset = {
+                id: code, // ใช้ code เป็น unique ID
                 code, name, category, brand, model, serial,
-                purchaseDate, price, location, department, status, description,
+                purchaseDate, price, quantity, location, department, status, description,
                 createdAt: new Date().toISOString()
             };
             
@@ -5934,7 +6165,7 @@
                 return;
             }
 
-            const confirmed = confirm('คุณต้องการเริ่มการนับสตอคใหม่ใช่หรือไม่?\n\nระบบจะสร้างรายการนับสตอคจากทรัพย์สินทั้งหมดในระบบ');
+            const confirmed = confirm('คุณต้องการเริ่มการนับสตอคใหม่ใช่หรือไม่?\n\n📦 Stock Count - Physical Inventory Verification\nระบบจะสร้างรายการนับสตอคจากทรัพย์สินทั้งหมดในระบบ\nคุณสามารถนับทีละส่วน (Cycle Count) หรือนับทั้งหมด (Full Count)');
             
             if (!confirmed) return;
 
@@ -5944,22 +6175,27 @@
             currentStockSession = {
                 id: 'SC-' + new Date().getTime(),
                 date: new Date().toISOString(),
-                status: 'in-progress'
+                type: 'Full Count', // Full Count or Cycle Count
+                status: 'in-progress',
+                startedBy: 'Admin',
+                startedAt: new Date().toISOString()
             };
 
             // สร้างรายการนับสตอคจากทรัพย์สินทั้งหมด
             stockCountData = assetsData.map(asset => ({
-                id: asset.id,
+                id: asset.id || asset.code,
                 code: asset.code,
                 name: asset.name,
                 category: asset.category,
                 location: asset.location,
-                systemQty: 1, // ในระบบนี้แต่ละทรัพย์สินมีจำนวน 1
-                actualQty: null, // รอการนับ
-                variance: 0,
+                systemQty: parseInt(asset.quantity) || 1, // Book Quantity
+                actualQty: null, // Physical Count - รอการนับ
+                variance: 0, // Difference
+                variancePercent: 0,
                 status: 'pending', // pending, counted, variance
                 remark: '',
-                countedDate: null
+                countedDate: null,
+                countedBy: null
             }));
 
             // บันทึกลง localStorage
@@ -5968,7 +6204,7 @@
 
             hideLoading();
             updateStockCountPage();
-            showNotification('✅ เริ่มการนับสตอคสำเร็จ! พบ ' + stockCountData.length + ' รายการ', 'success');
+            showNotification(`✅ เริ่มการนับสตอคสำเร็จ!\n📊 Session: ${currentStockSession.id}\n📦 พบ ${stockCountData.length} รายการ\n🔄 Total Quantity: ${stockCountData.reduce((sum, item) => sum + item.systemQty, 0)} หน่วย`, 'success');
         }
 
         // Update Stock Count Page
@@ -5986,15 +6222,22 @@
 
             // คำนวณสถิติ
             const totalItems = stockCountData.length;
+            const totalSystemQty = stockCountData.reduce((sum, item) => sum + item.systemQty, 0);
             const countedItems = stockCountData.filter(item => item.status === 'counted' || item.status === 'variance').length;
+            const countedQty = stockCountData
+                .filter(item => item.actualQty !== null)
+                .reduce((sum, item) => sum + item.actualQty, 0);
             const pendingItems = stockCountData.filter(item => item.status === 'pending').length;
             const varianceItems = stockCountData.filter(item => item.status === 'variance').length;
+            const totalVariance = stockCountData
+                .filter(item => item.actualQty !== null)
+                .reduce((sum, item) => sum + (item.actualQty - item.systemQty), 0);
 
             // อัพเดท Summary Cards
-            document.getElementById('stockTotalItems').textContent = totalItems;
-            document.getElementById('stockCountedItems').textContent = countedItems;
+            document.getElementById('stockTotalItems').textContent = `${totalItems} (${totalSystemQty.toLocaleString()} หน่วย)`;
+            document.getElementById('stockCountedItems').textContent = `${countedItems} (${countedQty.toLocaleString()} หน่วย)`;
             document.getElementById('stockPendingItems').textContent = pendingItems;
-            document.getElementById('stockVarianceItems').textContent = varianceItems;
+            document.getElementById('stockVarianceItems').textContent = `${varianceItems} (${totalVariance > 0 ? '+' : ''}${totalVariance})`;
 
             // แสดงตาราง
             filterStockCount();
@@ -6013,7 +6256,8 @@
                     <tr>
                         <td colspan="9" style="text-align: center; color: #aaa; padding: 40px;">
                             <i class="fas fa-clipboard-list" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i><br>
-                            กดปุ่ม "เริ่มนับสตอคใหม่" เพื่อเริ่มการนับ
+                            <strong>ยังไม่มีรายการนับสตอค</strong><br>
+                            <small>กดปุ่ม "เริ่มนับสตอคใหม่" เพื่อเริ่มการนับ Physical Inventory</small>
                         </td>
                     </tr>
                 `;
@@ -6044,17 +6288,21 @@
 
             tbody.innerHTML = filteredData.map(item => {
                 const variance = item.actualQty !== null ? (item.actualQty - item.systemQty) : '-';
+                const variancePercent = item.actualQty !== null && item.systemQty > 0
+                    ? ((variance / item.systemQty) * 100).toFixed(1) + '%'
+                    : '-';
+                
                 const varianceColor = variance === '-' ? '#999' : 
                                      variance === 0 ? '#10b981' : 
                                      variance > 0 ? '#06b6d4' : '#ef4444';
                 
-                let statusBadge, statusClass;
+                let statusBadge;
                 if (item.status === 'counted') {
-                    statusBadge = '<span class="badge complete">นับแล้ว</span>';
+                    statusBadge = '<span class="badge complete">✓ นับแล้ว</span>';
                 } else if (item.status === 'variance') {
-                    statusBadge = '<span class="badge maintenance">มีส่วนต่าง</span>';
+                    statusBadge = '<span class="badge maintenance">⚠ มีส่วนต่าง</span>';
                 } else {
-                    statusBadge = '<span class="badge available">รอนับ</span>';
+                    statusBadge = '<span class="badge available">○ รอนับ</span>';
                 }
 
                 return `
@@ -6062,18 +6310,26 @@
                         <td><strong>${item.code}</strong></td>
                         <td>${item.name}</td>
                         <td>${item.category}</td>
-                        <td>${item.location}</td>
-                        <td style="text-align: center; font-weight: 600;">${item.systemQty}</td>
-                        <td style="text-align: center; font-weight: 600; color: var(--primary);">
-                            ${item.actualQty !== null ? item.actualQty : '-'}
+                        <td>
+                            <i class="fas fa-map-marker-alt" style="color: var(--primary); margin-right: 5px;"></i>
+                            ${item.location}
                         </td>
-                        <td style="text-align: center; font-weight: bold; color: ${varianceColor};">
-                            ${variance !== '-' ? (variance > 0 ? '+' + variance : variance) : '-'}
+                        <td style="text-align: center; font-weight: 600; color: #333;">
+                            ${item.systemQty.toLocaleString()}
+                        </td>
+                        <td style="text-align: center; font-weight: 600; color: var(--primary);">
+                            ${item.actualQty !== null ? item.actualQty.toLocaleString() : '-'}
+                        </td>
+                        <td style="text-align: center;">
+                            <div style="font-weight: bold; color: ${varianceColor}; font-size: 16px;">
+                                ${variance !== '-' ? (variance > 0 ? '+' + variance : variance) : '-'}
+                            </div>
+                            ${variancePercent !== '-' ? `<small style="color: ${varianceColor};">(${variancePercent})</small>` : ''}
                         </td>
                         <td>${statusBadge}</td>
                         <td style="text-align: center;">
                             <button class="action-btn primary" onclick="openStockCountModal('${item.id}')" 
-                                    title="บันทึกการนับ">
+                                    title="บันทึกการนับ" ${item.status !== 'pending' ? 'style="background: #94a3b8;"' : ''}>
                                 <i class="fas fa-calculator"></i>
                             </button>
                         </td>
@@ -6091,7 +6347,7 @@
             document.getElementById('stockCountCode').textContent = item.code;
             document.getElementById('stockCountName').textContent = item.name;
             document.getElementById('stockCountLocation').textContent = item.location;
-            document.getElementById('stockCountSystem').textContent = item.systemQty;
+            document.getElementById('stockCountSystem').textContent = item.systemQty.toLocaleString();
             document.getElementById('stockCountActual').value = item.actualQty !== null ? item.actualQty : item.systemQty;
             document.getElementById('stockCountRemark').value = item.remark || '';
 
@@ -6105,7 +6361,7 @@
             const remark = document.getElementById('stockCountRemark').value;
 
             if (isNaN(actualQty) || actualQty < 0) {
-                showNotification('กรุณากรอกจำนวนที่ถูกต้อง', 'warning');
+                showNotification('⚠️ กรุณากรอกจำนวนที่ถูกต้อง (ต้องเป็นตัวเลข ≥ 0)', 'warning');
                 return;
             }
 
@@ -6114,16 +6370,28 @@
             if (item) {
                 item.actualQty = actualQty;
                 item.variance = actualQty - item.systemQty;
+                item.variancePercent = item.systemQty > 0 
+                    ? ((item.variance / item.systemQty) * 100).toFixed(2)
+                    : 0;
                 item.status = item.variance === 0 ? 'counted' : 'variance';
                 item.remark = remark;
                 item.countedDate = new Date().toISOString();
+                item.countedBy = 'Admin';
 
                 // บันทึกลง localStorage
                 localStorage.setItem('fmcgStockCount', JSON.stringify(stockCountData));
 
                 closeModal('stockCountModal');
                 updateStockCountPage();
-                showNotification('✅ บันทึกการนับสตอคสำเร็จ!', 'success');
+                
+                let message = '✅ บันทึกการนับสตอคสำเร็จ!\n';
+                message += `📦 ${item.name}\n`;
+                message += `📊 ระบบ: ${item.systemQty} | นับได้: ${actualQty}\n`;
+                if (item.variance !== 0) {
+                    message += `⚠️ ส่วนต่าง: ${item.variance > 0 ? '+' : ''}${item.variance} (${item.variancePercent}%)`;
+                }
+                
+                showNotification(message, item.variance === 0 ? 'success' : 'warning');
             }
         }
 
@@ -6139,24 +6407,53 @@
                 'ชื่อทรัพย์สิน': item.name,
                 'หมวดหมู่': item.category,
                 'สถานที่': item.location,
-                'จำนวนในระบบ': item.systemQty,
-                'จำนวนนับได้': item.actualQty !== null ? item.actualQty : '-',
-                'ส่วนต่าง': item.actualQty !== null ? (item.actualQty - item.systemQty) : '-',
+                'จำนวนในระบบ (Book)': item.systemQty,
+                'จำนวนนับได้ (Physical)': item.actualQty !== null ? item.actualQty : '-',
+                'ส่วนต่าง (Variance)': item.actualQty !== null ? (item.actualQty - item.systemQty) : '-',
+                'เปอร์เซ็นต์ส่วนต่าง': item.variancePercent ? item.variancePercent + '%' : '-',
                 'สถานะ': item.status === 'counted' ? 'นับแล้ว' : 
                          item.status === 'variance' ? 'มีส่วนต่าง' : 'รอนับ',
                 'หมายเหตุ': item.remark || '',
-                'วันที่นับ': item.countedDate ? new Date(item.countedDate).toLocaleDateString('th-TH') : '-'
+                'วันที่นับ': item.countedDate ? new Date(item.countedDate).toLocaleString('th-TH') : '-',
+                'ผู้นับ': item.countedBy || '-'
             }));
 
-            const ws = XLSX.utils.json_to_sheet(data);
+            // เพิ่ม Summary Sheet
+            const summary = [{
+                'รายละเอียด': 'Session ID',
+                'ค่า': currentStockSession ? currentStockSession.id : '-'
+            }, {
+                'รายละเอียด': 'วันที่เริ่ม',
+                'ค่า': currentStockSession ? new Date(currentStockSession.startedAt).toLocaleString('th-TH') : '-'
+            }, {
+                'รายละเอียด': 'ประเภท',
+                'ค่า': currentStockSession ? currentStockSession.type : '-'
+            }, {
+                'รายละเอียด': 'จำนวนรายการทั้งหมด',
+                'ค่า': stockCountData.length
+            }, {
+                'รายละเอียด': 'นับแล้ว',
+                'ค่า': stockCountData.filter(i => i.actualQty !== null).length
+            }, {
+                'รายละเอียด': 'รอนับ',
+                'ค่า': stockCountData.filter(i => i.actualQty === null).length
+            }, {
+                'รายละเอียด': 'มีส่วนต่าง',
+                'ค่า': stockCountData.filter(i => i.status === 'variance').length
+            }];
+
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Stock Count');
+            const ws1 = XLSX.utils.json_to_sheet(summary);
+            const ws2 = XLSX.utils.json_to_sheet(data);
+            
+            XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
+            XLSX.utils.book_append_sheet(wb, ws2, 'Stock Count Detail');
 
             const date = new Date().toISOString().split('T')[0];
             const sessionId = currentStockSession ? currentStockSession.id : 'SC';
             XLSX.writeFile(wb, `Stock_Count_${sessionId}_${date}.xlsx`);
 
-            showNotification('✅ Export Stock Count สำเร็จ!', 'success');
+            showNotification('✅ Export Stock Count Report สำเร็จ!', 'success');
         }
 
         // Show Notification
