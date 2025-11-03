@@ -64,6 +64,9 @@ function saveEditAsset() {
         return;
     }
     
+    // เก็บข้อมูลเดิมไว้สำหรับบันทึกประวัติ
+    const oldAsset = { ...assetsData[assetIndex] };
+    
     // อัพเดทข้อมูล
     assetsData[assetIndex] = {
         ...assetsData[assetIndex],
@@ -82,8 +85,15 @@ function saveEditAsset() {
         lastUpdated: new Date().toISOString()
     };
     
+    const newAsset = assetsData[assetIndex];
+    
     // บันทึกลง localStorage
     localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
+    
+    // 📝 บันทึกประวัติการแก้ไข
+    if (typeof logAssetUpdate === 'function') {
+        logAssetUpdate(oldAsset, newAsset);
+    }
     
     // ถ้ามีการเชื่อมต่อ Google Sheets ให้ซิงค์
     if (typeof sheetsConfig !== 'undefined' && sheetsConfig.webAppUrl) {
@@ -300,6 +310,11 @@ function confirmDeleteAsset(code) {
         showNotification('❌ ไม่พบทรัพย์สิน', 'error');
         closeDeleteModal();
         return;
+    }
+    
+    // 📝 บันทึกประวัติการลบก่อนลบจริง
+    if (typeof logAssetDeletion === 'function') {
+        logAssetDeletion(asset);
     }
     
     // ลบออกจาก array
