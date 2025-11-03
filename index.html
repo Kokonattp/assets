@@ -3393,15 +3393,18 @@
         }
 
         function populateDatalist() {
-            // Locations
-            const locations = [...new Set(assetsData.map(a => a.location).filter(Boolean))];
+            // Locations - ใช้ getAllLocations() เพื่อรวมทุกสถานที่
+            const locations = getAllLocations();
             const locationList = document.getElementById('locationList');
             locationList.innerHTML = locations.map(loc => `<option value="${loc}">`).join('');
             
-            // Departments
-            const departments = [...new Set(assetsData.map(a => a.department).filter(Boolean))];
+            // Departments - รวมจาก assets และ default departments
+            const defaultDepartments = ['สำรอง', 'AC', 'AP', 'APB', 'CF', 'APL', 'CP', 'DP', 'INV', 'LS', 'QA', 'RC', 'ST'];
+            const assetsDeparts = [...new Set(assetsData.map(a => a.department).filter(Boolean))];
+            const allDepartments = [...new Set([...defaultDepartments, ...assetsDeparts])].sort();
+            
             const departmentList = document.getElementById('departmentList');
-            departmentList.innerHTML = departments.map(dept => `<option value="${dept}">`).join('');
+            departmentList.innerHTML = allDepartments.map(dept => `<option value="${dept}">`).join('');
         }
 
         function confirmTransfer() {
@@ -4373,7 +4376,17 @@
                 'คลังสินค้ารอง',
                 'ศูนย์กระจายสินค้า'
             ];
-            return [...defaultLocations, ...customLocations.map(l => l.name)];
+            
+            // เพิ่มสถานที่จากทรัพย์สินที่มีอยู่
+            const locationsFromAssets = [...new Set(assetsData.map(a => a.location).filter(Boolean))];
+            
+            // รวมกับ custom locations
+            const customLocs = customLocations.map(l => l.name);
+            
+            // รวมทั้งหมดและเอาที่ซ้ำออก
+            const allLocations = [...new Set([...defaultLocations, ...locationsFromAssets, ...customLocs])];
+            
+            return allLocations.sort(); // เรียงตามตัวอักษร
         }
 
         // Update location dropdowns
