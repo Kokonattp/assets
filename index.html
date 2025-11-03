@@ -62,10 +62,19 @@
             gap: 10px;
             padding: 10px;
             white-space: nowrap;
+            border-bottom: 2px solid rgba(255,255,255,0.2);
+            padding-bottom: 20px;
         }
 
         .logo i {
             font-size: 32px;
+            animation: logoFloat 3s ease-in-out infinite;
+            filter: drop-shadow(0 0 10px rgba(255,255,255,0.5));
+        }
+
+        @keyframes logoFloat {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-5px) rotate(5deg); }
         }
 
         .sidebar.collapsed .logo span,
@@ -83,24 +92,53 @@
             align-items: center;
             gap: 15px;
             font-size: 15px;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
             white-space: nowrap;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .menu-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 3px;
+            background: white;
+            transform: scaleY(0);
+            transition: transform 0.3s ease;
         }
 
         .menu-item:hover {
-            background: rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.15);
             color: white;
+            transform: translateX(5px);
+        }
+
+        .menu-item:hover::before {
+            transform: scaleY(1);
+        }
+
+        .menu-item:hover i {
+            transform: scale(1.1);
         }
 
         .menu-item.active {
             background: white;
             color: var(--primary);
             font-weight: 600;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .menu-item.active::before {
+            display: none;
         }
 
         .menu-item i {
             font-size: 18px;
             width: 25px;
+            transition: transform 0.3s ease;
         }
 
         .menu-toggle {
@@ -118,11 +156,22 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
         }
 
         .menu-toggle:hover {
-            background: rgba(255,255,255,0.3);
+            background: rgba(255,255,255,0.35);
+            transform: translateX(-50%) scale(1.1);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .menu-toggle i {
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar.collapsed .menu-toggle i {
+            transform: rotate(180deg);
         }
 
         /* Main Content */
@@ -814,22 +863,22 @@
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <div class="logo">
-            <i class="fas fa-warehouse"></i>
+            <i class="fas fa-cube"></i>
             <span>FMCG Asset</span>
         </div>
         
         <div class="menu-item active" onclick="showPage('dashboard')">
-            <i class="fas fa-home"></i>
+            <i class="fas fa-house"></i>
             <span>แดชบอร์ด</span>
         </div>
         
         <div class="menu-item" onclick="showPage('assets')">
-            <i class="fas fa-boxes"></i>
+            <i class="fas fa-boxes-stacked"></i>
             <span>รายการทรัพย์สิน</span>
         </div>
 
         <div class="menu-item" onclick="showPage('add-asset')">
-            <i class="fas fa-plus-circle"></i>
+            <i class="fas fa-square-plus"></i>
             <span>เพิ่มทรัพย์สิน</span>
         </div>
 
@@ -844,7 +893,7 @@
         </div>
 
         <div class="menu-item" onclick="showPage('locations')">
-            <i class="fas fa-map-marker-alt"></i>
+            <i class="fas fa-map-location-dot"></i>
             <span>สถานที่เก็บ</span>
         </div>
         
@@ -854,17 +903,17 @@
         </div>
         
         <div class="menu-item" onclick="showPage('reports')">
-            <i class="fas fa-chart-bar"></i>
+            <i class="fas fa-chart-pie"></i>
             <span>รายงาน</span>
         </div>
         
         <div class="menu-item" onclick="showPage('settings')">
-            <i class="fas fa-cog"></i>
+            <i class="fas fa-sliders"></i>
             <span>ตั้งค่า</span>
         </div>
 
         <button class="menu-toggle" onclick="toggleSidebar()">
-            <i class="fas fa-bars"></i>
+            <i class="fas fa-angles-left"></i>
         </button>
     </div>
 
@@ -1775,11 +1824,20 @@
         // 3. แทนที่ URL ด้านล่างนี้
         const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcSH7cQ3kYiSvMkj49uounseXuUAwH6q2iFS85fZFV8FcwoC0X5ojPOJpRNt1PAuge/exec';
         
-        // ⚙️ ตั้งค่า Google Sheets API (สำหรับอ่านข้อมูลแบบเร็ว - ถ้ามี)
-        const USE_SHEETS_API = true; // เปลี่ยนเป็น true ถ้าต้องการใช้ Sheets API
-        const SHEETS_API_KEY = 'AIzaSyCbId0_NCsmI84pl3vRJdqokZRHoMWHmCM';
-        const SPREADSHEET_ID = '1o_Wpre0DNfh5XNIEiWR-8uI3zCDaYxCysI5utuDDkBI';
-        const SHEET_NAME = 'Assets';
+        // ========================================
+        // ⚡ Google Sheets API (เร็วกว่า - แนะนำ!)
+        // ========================================
+        // ข้อดี: โหลดข้อมูลเร็วกว่า Apps Script มาก
+        // ข้อจำกัด: ใช้ได้เฉพาะการอ่านข้อมูล (การบันทึกยังใช้ Apps Script)
+        // 
+        // วิธีตั้งค่า:
+        // 1. เปิด Google Cloud Console
+        // 2. สร้าง API Key สำหรับ Sheets API
+        // 3. ใส่ค่าด้านล่างนี้
+        const USE_SHEETS_API = true; // ⭐ เปิดใช้งาน Sheets API (แนะนำ)
+        const SHEETS_API_KEY = 'AIzaSyCbId0_NCsmI84pl3vRJdqokZRHoMWHmCM'; // 🔑 API Key ของคุณ
+        const SPREADSHEET_ID = '1o_Wpre0DNfh5XNIEiWR-8uI3zCDaYxCysI5utuDDkBI'; // 📊 Spreadsheet ID
+        const SHEET_NAME = 'Assets'; // 📝 ชื่อ Tab ใน Sheets
         
         let sheetsConfig = {
             webAppUrl: GOOGLE_APPS_SCRIPT_URL,
@@ -3016,6 +3074,18 @@
             
             showLoading();
             
+            // ⚡ ถ้าเปิดใช้งาน Sheets API ให้ใช้วิธีนี้ (เร็วกว่า)
+            if (USE_SHEETS_API && SHEETS_API_KEY && SPREADSHEET_ID) {
+                try {
+                    await loadFromSheetsAPI();
+                    return;
+                } catch (error) {
+                    console.warn('Sheets API failed, fallback to Apps Script:', error);
+                    // ถ้า Sheets API ไม่สำเร็จ ให้ลองใช้ Apps Script แทน
+                }
+            }
+            
+            // 📝 ใช้ Google Apps Script (วิธีสำรอง)
             try {
                 const response = await fetch(webAppUrl);
                 
@@ -3051,7 +3121,7 @@
                 localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
                 
                 hideLoading();
-                showNotification(`✅ โหลดข้อมูล ${loadedAssets.length} รายการสำเร็จ!`, 'success');
+                showNotification(`✅ โหลดข้อมูล ${loadedAssets.length} รายการสำเร็จ! (Apps Script)`, 'success');
                 
                 updateDashboard();
                 renderAssetsTable();
@@ -3060,6 +3130,51 @@
                 hideLoading();
                 showNotification('❌ เกิดข้อผิดพลาด: ' + error.message, 'error');
             }
+        }
+
+        // ⚡ Load Data from Google Sheets API (เร็วกว่า Apps Script)
+        async function loadFromSheetsAPI() {
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}?key=${SHEETS_API_KEY}`;
+            
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error('Sheets API Error: ' + response.status);
+            }
+            
+            const data = await response.json();
+            
+            if (!data.values || data.values.length <= 1) {
+                hideLoading();
+                showNotification('⚠️ ไม่พบข้อมูลใน Google Sheets', 'warning');
+                return;
+            }
+            
+            // แปลงข้อมูลจาก Sheets API
+            const loadedAssets = data.values.slice(1).map(row => ({
+                code: row[0] || '',
+                name: row[1] || '',
+                category: row[2] || '',
+                brand: row[3] || '',
+                model: row[4] || '',
+                serial: row[5] || '',
+                purchaseDate: row[6] || '',
+                price: row[7] || 0,
+                location: row[8] || '',
+                department: row[9] || '',
+                status: row[10] || 'สมบูรณ์',
+                description: row[11] || '',
+                createdAt: row[12] || new Date().toISOString()
+            })).filter(asset => asset.code && asset.name);
+            
+            assetsData = loadedAssets;
+            localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
+            
+            hideLoading();
+            showNotification(`⚡ โหลดข้อมูล ${loadedAssets.length} รายการสำเร็จ! (Sheets API - เร็ว)`, 'success');
+            
+            updateDashboard();
+            renderAssetsTable();
         }
 
         // Save to Google Sheets
