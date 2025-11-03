@@ -899,6 +899,11 @@
             <span>สถานที่เก็บ</span>
         </div>
         
+        <div class="menu-item" onclick="showPage('stock-count')">
+            <i class="fas fa-clipboard-check"></i>
+            <span>นับสตอค</span>
+        </div>
+        
         <div class="menu-item" onclick="showPage('maintenance')">
             <i class="fas fa-wrench"></i>
             <span>บำรุงรักษา</span>
@@ -1234,6 +1239,7 @@
                         <label>สถานที่เก็บ <span class="required">*</span></label>
                         <select id="newLocation" required>
                             <option value="">เลือกสถานที่</option>
+                            <option>คลังเก็บสินค้า</option>
                             <option>คลังสินค้าหลัก - โซน A</option>
                             <option>คลังสินค้าหลัก - โซน B</option>
                             <option>คลังสินค้าหลัก - โซน C</option>
@@ -1583,6 +1589,175 @@
                             <i class="fas fa-times"></i> ยกเลิก
                         </button>
                         <button class="btn btn-success" onclick="saveCapacity()">
+                            <i class="fas fa-check"></i> บันทึก
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stock Count Page -->
+        <div id="stock-count" class="page">
+            <div class="header">
+                <h1><i class="fas fa-clipboard-check"></i> ระบบนับสตอค</h1>
+                <div class="header-actions">
+                    <button class="btn btn-success" onclick="startStockCount()">
+                        <i class="fas fa-play"></i>
+                        เริ่มนับสตอคใหม่
+                    </button>
+                    <button class="btn btn-primary" onclick="exportStockCount()">
+                        <i class="fas fa-file-excel"></i>
+                        Export รายงาน
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stock Count Summary -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon teal">
+                        <i class="fas fa-boxes"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="stockTotalItems">0</h3>
+                        <p>รายการทั้งหมด</p>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon green">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="stockCountedItems">0</h3>
+                        <p>นับแล้ว</p>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon orange">
+                        <i class="fas fa-hourglass-half"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="stockPendingItems">0</h3>
+                        <p>รอนับ</p>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon red">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="stockVarianceItems">0</h3>
+                        <p>ส่วนต่าง</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search and Filter -->
+            <div class="table-container" style="margin-bottom: 20px;">
+                <div class="table-header">
+                    <h2><i class="fas fa-filter"></i> ค้นหาและกรอง</h2>
+                    <div class="search-box">
+                        <input type="text" id="stockSearchInput" placeholder="ค้นหารหัส, ชื่อ..." onkeyup="filterStockCount()">
+                        <select id="stockLocationFilter" onchange="filterStockCount()">
+                            <option value="">ทุกสถานที่</option>
+                            <option>คลังเก็บสินค้า</option>
+                            <option>คลังสินค้าหลัก - โซน A</option>
+                            <option>คลังสินค้าหลัก - โซน B</option>
+                            <option>คลังสินค้าหลัก - โซน C</option>
+                            <option>คลังสินค้ารอง</option>
+                            <option>ศูนย์กระจายสินค้า</option>
+                        </select>
+                        <select id="stockStatusFilter" onchange="filterStockCount()">
+                            <option value="">ทุกสถานะ</option>
+                            <option value="counted">นับแล้ว</option>
+                            <option value="pending">รอนับ</option>
+                            <option value="variance">มีส่วนต่าง</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stock Count Table -->
+            <div class="table-container">
+                <h2 style="margin-bottom: 20px;">รายการนับสตอค</h2>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>รหัส</th>
+                            <th>ชื่อทรัพย์สิน</th>
+                            <th>หมวดหมู่</th>
+                            <th>สถานที่</th>
+                            <th style="text-align: center;">จำนวนในระบบ</th>
+                            <th style="text-align: center;">จำนวนนับได้</th>
+                            <th style="text-align: center;">ส่วนต่าง</th>
+                            <th>สถานะ</th>
+                            <th style="text-align: center;">การจัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stockCountTableBody">
+                        <tr>
+                            <td colspan="9" style="text-align: center; color: #aaa; padding: 40px;">
+                                <i class="fas fa-clipboard-list" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i><br>
+                                กดปุ่ม "เริ่มนับสตอคใหม่" เพื่อเริ่มการนับ
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Stock Count Modal -->
+        <div id="stockCountModal" class="modal">
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-calculator"></i> บันทึกการนับสตอค</h2>
+                    <button class="close-btn" onclick="closeModal('stockCountModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="stockCountAssetId">
+                    
+                    <div class="form-group">
+                        <label><strong>รหัสทรัพย์สิน:</strong></label>
+                        <p id="stockCountCode" style="color: var(--primary); font-weight: 600;"></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label><strong>ชื่อทรัพย์สิน:</strong></label>
+                        <p id="stockCountName"></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label><strong>สถานที่เก็บ:</strong></label>
+                        <p id="stockCountLocation"></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label><strong>จำนวนในระบบ:</strong></label>
+                        <p id="stockCountSystem" style="font-size: 24px; color: var(--primary); font-weight: 600;">1</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label>จำนวนนับได้จริง <span class="required">*</span></label>
+                        <input type="number" id="stockCountActual" min="0" value="1" placeholder="กรอกจำนวนที่นับได้" required>
+                        <small style="color: #666; display: block; margin-top: 5px;">
+                            <i class="fas fa-info-circle"></i> กรอกจำนวนที่นับได้จริงในคลัง
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>หมายเหตุ</label>
+                        <textarea id="stockCountRemark" placeholder="บันทึกข้อมูลเพิ่มเติม..."></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button class="btn btn-secondary" onclick="closeModal('stockCountModal')">
+                            <i class="fas fa-times"></i> ยกเลิก
+                        </button>
+                        <button class="btn btn-success" onclick="saveStockCount()">
                             <i class="fas fa-check"></i> บันทึก
                         </button>
                     </div>
@@ -5504,6 +5679,242 @@
             showNotification('✅ Export Excel สำเร็จ!', 'success');
         }
 
+        // ==================== Stock Count Functions ====================
+        let stockCountData = [];
+        let currentStockSession = null;
+
+        // Start Stock Count
+        function startStockCount() {
+            if (assetsData.length === 0) {
+                showNotification('ไม่มีทรัพย์สินในระบบ กรุณาเพิ่มทรัพย์สินก่อน', 'warning');
+                return;
+            }
+
+            const confirmed = confirm('คุณต้องการเริ่มการนับสตอคใหม่ใช่หรือไม่?\n\nระบบจะสร้างรายการนับสตอคจากทรัพย์สินทั้งหมดในระบบ');
+            
+            if (!confirmed) return;
+
+            showLoading();
+
+            // สร้าง session ID ใหม่
+            currentStockSession = {
+                id: 'SC-' + new Date().getTime(),
+                date: new Date().toISOString(),
+                status: 'in-progress'
+            };
+
+            // สร้างรายการนับสตอคจากทรัพย์สินทั้งหมด
+            stockCountData = assetsData.map(asset => ({
+                id: asset.id,
+                code: asset.code,
+                name: asset.name,
+                category: asset.category,
+                location: asset.location,
+                systemQty: 1, // ในระบบนี้แต่ละทรัพย์สินมีจำนวน 1
+                actualQty: null, // รอการนับ
+                variance: 0,
+                status: 'pending', // pending, counted, variance
+                remark: '',
+                countedDate: null
+            }));
+
+            // บันทึกลง localStorage
+            localStorage.setItem('fmcgStockCount', JSON.stringify(stockCountData));
+            localStorage.setItem('fmcgStockSession', JSON.stringify(currentStockSession));
+
+            hideLoading();
+            updateStockCountPage();
+            showNotification('✅ เริ่มการนับสตอคสำเร็จ! พบ ' + stockCountData.length + ' รายการ', 'success');
+        }
+
+        // Update Stock Count Page
+        function updateStockCountPage() {
+            // โหลดข้อมูลจาก localStorage
+            const savedStock = localStorage.getItem('fmcgStockCount');
+            const savedSession = localStorage.getItem('fmcgStockSession');
+            
+            if (savedStock) {
+                stockCountData = JSON.parse(savedStock);
+            }
+            if (savedSession) {
+                currentStockSession = JSON.parse(savedSession);
+            }
+
+            // คำนวณสถิติ
+            const totalItems = stockCountData.length;
+            const countedItems = stockCountData.filter(item => item.status === 'counted' || item.status === 'variance').length;
+            const pendingItems = stockCountData.filter(item => item.status === 'pending').length;
+            const varianceItems = stockCountData.filter(item => item.status === 'variance').length;
+
+            // อัพเดท Summary Cards
+            document.getElementById('stockTotalItems').textContent = totalItems;
+            document.getElementById('stockCountedItems').textContent = countedItems;
+            document.getElementById('stockPendingItems').textContent = pendingItems;
+            document.getElementById('stockVarianceItems').textContent = varianceItems;
+
+            // แสดงตาราง
+            filterStockCount();
+        }
+
+        // Filter Stock Count
+        function filterStockCount() {
+            const searchText = document.getElementById('stockSearchInput').value.toLowerCase();
+            const locationFilter = document.getElementById('stockLocationFilter').value;
+            const statusFilter = document.getElementById('stockStatusFilter').value;
+
+            const tbody = document.getElementById('stockCountTableBody');
+            
+            if (stockCountData.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" style="text-align: center; color: #aaa; padding: 40px;">
+                            <i class="fas fa-clipboard-list" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i><br>
+                            กดปุ่ม "เริ่มนับสตอคใหม่" เพื่อเริ่มการนับ
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            let filteredData = stockCountData.filter(item => {
+                const matchSearch = !searchText || 
+                    item.code.toLowerCase().includes(searchText) ||
+                    item.name.toLowerCase().includes(searchText);
+                
+                const matchLocation = !locationFilter || item.location === locationFilter;
+                const matchStatus = !statusFilter || item.status === statusFilter;
+
+                return matchSearch && matchLocation && matchStatus;
+            });
+
+            if (filteredData.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" style="text-align: center; color: #aaa; padding: 40px;">
+                            ไม่พบข้อมูลตามเงื่อนไขที่เลือก
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = filteredData.map(item => {
+                const variance = item.actualQty !== null ? (item.actualQty - item.systemQty) : '-';
+                const varianceColor = variance === '-' ? '#999' : 
+                                     variance === 0 ? '#10b981' : 
+                                     variance > 0 ? '#06b6d4' : '#ef4444';
+                
+                let statusBadge, statusClass;
+                if (item.status === 'counted') {
+                    statusBadge = '<span class="badge complete">นับแล้ว</span>';
+                } else if (item.status === 'variance') {
+                    statusBadge = '<span class="badge maintenance">มีส่วนต่าง</span>';
+                } else {
+                    statusBadge = '<span class="badge available">รอนับ</span>';
+                }
+
+                return `
+                    <tr>
+                        <td><strong>${item.code}</strong></td>
+                        <td>${item.name}</td>
+                        <td>${item.category}</td>
+                        <td>${item.location}</td>
+                        <td style="text-align: center; font-weight: 600;">${item.systemQty}</td>
+                        <td style="text-align: center; font-weight: 600; color: var(--primary);">
+                            ${item.actualQty !== null ? item.actualQty : '-'}
+                        </td>
+                        <td style="text-align: center; font-weight: bold; color: ${varianceColor};">
+                            ${variance !== '-' ? (variance > 0 ? '+' + variance : variance) : '-'}
+                        </td>
+                        <td>${statusBadge}</td>
+                        <td style="text-align: center;">
+                            <button class="action-btn primary" onclick="openStockCountModal('${item.id}')" 
+                                    title="บันทึกการนับ">
+                                <i class="fas fa-calculator"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Open Stock Count Modal
+        function openStockCountModal(assetId) {
+            const item = stockCountData.find(s => s.id === assetId);
+            if (!item) return;
+
+            document.getElementById('stockCountAssetId').value = item.id;
+            document.getElementById('stockCountCode').textContent = item.code;
+            document.getElementById('stockCountName').textContent = item.name;
+            document.getElementById('stockCountLocation').textContent = item.location;
+            document.getElementById('stockCountSystem').textContent = item.systemQty;
+            document.getElementById('stockCountActual').value = item.actualQty !== null ? item.actualQty : item.systemQty;
+            document.getElementById('stockCountRemark').value = item.remark || '';
+
+            document.getElementById('stockCountModal').classList.add('active');
+        }
+
+        // Save Stock Count
+        function saveStockCount() {
+            const assetId = document.getElementById('stockCountAssetId').value;
+            const actualQty = parseInt(document.getElementById('stockCountActual').value);
+            const remark = document.getElementById('stockCountRemark').value;
+
+            if (isNaN(actualQty) || actualQty < 0) {
+                showNotification('กรุณากรอกจำนวนที่ถูกต้อง', 'warning');
+                return;
+            }
+
+            // หา item และอัพเดท
+            const item = stockCountData.find(s => s.id === assetId);
+            if (item) {
+                item.actualQty = actualQty;
+                item.variance = actualQty - item.systemQty;
+                item.status = item.variance === 0 ? 'counted' : 'variance';
+                item.remark = remark;
+                item.countedDate = new Date().toISOString();
+
+                // บันทึกลง localStorage
+                localStorage.setItem('fmcgStockCount', JSON.stringify(stockCountData));
+
+                closeModal('stockCountModal');
+                updateStockCountPage();
+                showNotification('✅ บันทึกการนับสตอคสำเร็จ!', 'success');
+            }
+        }
+
+        // Export Stock Count
+        function exportStockCount() {
+            if (stockCountData.length === 0) {
+                showNotification('ไม่มีข้อมูลการนับสตอคให้ Export', 'warning');
+                return;
+            }
+
+            const data = stockCountData.map(item => ({
+                'รหัสทรัพย์สิน': item.code,
+                'ชื่อทรัพย์สิน': item.name,
+                'หมวดหมู่': item.category,
+                'สถานที่': item.location,
+                'จำนวนในระบบ': item.systemQty,
+                'จำนวนนับได้': item.actualQty !== null ? item.actualQty : '-',
+                'ส่วนต่าง': item.actualQty !== null ? (item.actualQty - item.systemQty) : '-',
+                'สถานะ': item.status === 'counted' ? 'นับแล้ว' : 
+                         item.status === 'variance' ? 'มีส่วนต่าง' : 'รอนับ',
+                'หมายเหตุ': item.remark || '',
+                'วันที่นับ': item.countedDate ? new Date(item.countedDate).toLocaleDateString('th-TH') : '-'
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Stock Count');
+
+            const date = new Date().toISOString().split('T')[0];
+            const sessionId = currentStockSession ? currentStockSession.id : 'SC';
+            XLSX.writeFile(wb, `Stock_Count_${sessionId}_${date}.xlsx`);
+
+            showNotification('✅ Export Stock Count สำเร็จ!', 'success');
+        }
+
         // Show Notification
         function showNotification(message, type = 'success') {
             const notification = document.getElementById('notification');
@@ -5572,6 +5983,7 @@
                 updateLocationsPage();
                 updateMaintenancePage();
                 updateReportsPage();
+                updateStockCountPage(); // เพิ่มการโหลด Stock Count
             }
         });
 
