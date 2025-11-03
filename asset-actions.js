@@ -13,6 +13,11 @@ function editAsset(code) {
         return;
     }
     
+    // อัพเดท location dropdown ให้แสดงค่าที่มีจริง
+    if (typeof updateLocationDropdowns === 'function') {
+        updateLocationDropdowns();
+    }
+    
     // เติมข้อมูลลงในฟอร์ม (ใช้ ID ที่ตรงกับ HTML)
     document.getElementById('editAssetCode').value = asset.code;
     document.getElementById('editCode').value = asset.code;
