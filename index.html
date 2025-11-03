@@ -524,6 +524,11 @@
             color: #075985;
         }
 
+        .action-btn.primary {
+            background: #ccfbf1;
+            color: #0f766e;
+        }
+
         .action-btn.edit {
             background: #d1fae5;
             color: #065f46;
@@ -881,11 +886,6 @@
             <i class="fas fa-square-plus"></i>
             <span>เพิ่มทรัพย์สิน</span>
         </div>
-
-        <div class="menu-item" onclick="showPage('import')">
-            <i class="fas fa-file-excel"></i>
-            <span>Import Excel</span>
-        </div>
         
         <div class="menu-item" onclick="showPage('departments')">
             <i class="fas fa-building"></i>
@@ -1053,10 +1053,6 @@
                         <i class="fas fa-plus"></i>
                         เพิ่มทรัพย์สิน
                     </button>
-                    <button class="btn btn-info" onclick="showPage('import')">
-                        <i class="fas fa-file-excel"></i>
-                        Import
-                    </button>
                     <button class="btn btn-primary" onclick="exportToExcel()">
                         <i class="fas fa-file-export"></i>
                         Export
@@ -1124,14 +1120,49 @@
             <div class="header">
                 <h1><i class="fas fa-plus-circle"></i> เพิ่มทรัพย์สินใหม่</h1>
                 <div class="header-actions">
+                    <button class="btn btn-warning" onclick="showImportSection()">
+                        <i class="fas fa-file-excel"></i>
+                        Import จาก Excel
+                    </button>
                     <button class="btn btn-secondary" onclick="showPage('assets')">
                         <i class="fas fa-arrow-left"></i>
-                        ยกเลิก
+                        กลับ
                     </button>
                     <button class="btn btn-success" onclick="saveNewAsset()">
                         <i class="fas fa-save"></i>
                         บันทึก
                     </button>
+                </div>
+            </div>
+
+            <!-- Import Excel Section -->
+            <div id="importSection" style="display: none; margin-bottom: 30px;">
+                <div class="table-container" style="background: #fff3cd; border: 2px solid #ffc107;">
+                    <h2 style="margin-bottom: 20px; color: #856404;">
+                        <i class="fas fa-file-excel"></i> Import ข้อมูลจาก Excel
+                    </h2>
+                    
+                    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                        <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="flex: 1; min-width: 250px; padding: 10px; border: 2px dashed #ffc107; border-radius: 8px; background: white;">
+                        
+                        <button class="btn btn-primary" onclick="processExcelFile()">
+                            <i class="fas fa-upload"></i>
+                            อัปโหลดและประมวลผล
+                        </button>
+                        
+                        <button class="btn btn-secondary" onclick="hideImportSection()">
+                            <i class="fas fa-times"></i>
+                            ปิด
+                        </button>
+                    </div>
+
+                    <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 8px;">
+                        <small style="color: #856404;">
+                            <i class="fas fa-info-circle"></i> 
+                            <strong>รองรับไฟล์:</strong> .xlsx, .xls | 
+                            <strong>คอลัมน์ที่ต้องมี:</strong> รหัสทรัพย์สิน, ชื่อทรัพย์สิน, หมวดหมู่, ราคา
+                        </small>
+                    </div>
                 </div>
             </div>
 
@@ -1584,66 +1615,245 @@
         <!-- Reports Page -->
         <div id="reports" class="page">
             <div class="header">
-                <h1><i class="fas fa-chart-bar"></i> รายงานและสถิติ</h1>
+                <h1><i class="fas fa-chart-line"></i> รายงานและสถิติแบบละเอียด</h1>
                 <div class="header-actions">
-                    <button class="btn btn-success" onclick="exportToExcel()">
+                    <button class="btn btn-primary" onclick="refreshReports()">
+                        <i class="fas fa-sync"></i>
+                        รีเฟรช
+                    </button>
+                    <button class="btn btn-success" onclick="exportDetailedReport()">
                         <i class="fas fa-file-excel"></i>
-                        Export Excel
+                        Export รายงาน
                     </button>
                 </div>
             </div>
 
+            <!-- Filter Section -->
+            <div class="table-container" style="margin-bottom: 20px;">
+                <h2 style="margin-bottom: 20px;">
+                    <i class="fas fa-filter"></i> กรองข้อมูลตามช่วงเวลา
+                </h2>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>วันที่เริ่มต้น</label>
+                        <input type="date" id="reportStartDate" onchange="updateReportsByDateRange()">
+                    </div>
+                    <div class="form-group">
+                        <label>วันที่สิ้นสุด</label>
+                        <input type="date" id="reportEndDate" onchange="updateReportsByDateRange()">
+                    </div>
+                    <div class="form-group">
+                        <label>ช่วงเวลาด่วน</label>
+                        <select id="quickDateRange" onchange="applyQuickDateRange()">
+                            <option value="">เลือกช่วงเวลา</option>
+                            <option value="today">วันนี้</option>
+                            <option value="week">7 วันที่แล้ว</option>
+                            <option value="month">30 วันที่แล้ว</option>
+                            <option value="quarter">3 เดือนที่แล้ว</option>
+                            <option value="year">ปีนี้</option>
+                            <option value="all">ทั้งหมด</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>แสดงตาม</label>
+                        <select id="reportGroupBy" onchange="updateReportsPage()">
+                            <option value="category">หมวดหมู่</option>
+                            <option value="location">สถานที่</option>
+                            <option value="department">แผนก</option>
+                            <option value="status">สถานะ</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary Stats -->
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-icon teal">
-                        <i class="fas fa-dollar-sign"></i>
+                        <i class="fas fa-boxes"></i>
                     </div>
                     <div class="stat-info">
-                        <h3 id="totalValue">฿0</h3>
-                        <p>มูลค่าทรัพย์สินทั้งหมด</p>
+                        <h3 id="reportTotalAssets">0</h3>
+                        <p>ทรัพย์สินทั้งหมด</p>
+                        <small id="reportAssetChange" style="color: #10b981;"></small>
                     </div>
                 </div>
 
                 <div class="stat-card">
                     <div class="stat-icon green">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="reportTotalValue">฿0</h3>
+                        <p>มูลค่ารวมทั้งหมด</p>
+                        <small id="reportValueChange" style="color: #10b981;"></small>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon blue">
                         <i class="fas fa-chart-line"></i>
                     </div>
                     <div class="stat-info">
-                        <h3 id="depreciationValue">฿0</h3>
-                        <p>ค่าเสื่อมราคาสะสม (15%)</p>
+                        <h3 id="reportAvgValue">฿0</h3>
+                        <p>มูลค่าเฉลี่ยต่อชิ้น</p>
+                        <small id="reportAvgChange" style="color: #10b981;"></small>
                     </div>
                 </div>
 
                 <div class="stat-card">
                     <div class="stat-icon orange">
-                        <i class="fas fa-wrench"></i>
+                        <i class="fas fa-chart-pie"></i>
                     </div>
                     <div class="stat-info">
-                        <h3 id="maintenanceValueReport">฿0</h3>
-                        <p>ค่าซ่อมบำรุงประมาณการ</p>
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon cyan">
-                        <i class="fas fa-percentage"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3 id="usageRate">0%</h3>
-                        <p>อัตราการใช้งาน</p>
+                        <h3 id="reportDepreciation">฿0</h3>
+                        <p>ค่าเสื่อมราคา (15%)</p>
+                        <small style="color: #666;">มูลค่าหลังหัก</small>
                     </div>
                 </div>
             </div>
 
-            <div class="charts-grid">
-                <div class="chart-card">
-                    <h2><i class="fas fa-chart-bar"></i> จำนวนทรัพย์สินแยกตามหมวดหมู่</h2>
-                    <canvas id="assetCountChart"></canvas>
-                </div>
+            <!-- Value Breakdown Section -->
+            <div style="margin-top: 30px;">
+                <h2 style="margin-bottom: 20px;">
+                    <i class="fas fa-money-bill-trend-up"></i> การวิเคราะห์มูลค่าทรัพย์สินแบบละเอียด
+                </h2>
+                
+                <div class="charts-grid" style="grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));">
+                    <!-- Value by Category -->
+                    <div class="chart-card">
+                        <h3><i class="fas fa-layer-group"></i> มูลค่าแยกตามหมวดหมู่</h3>
+                        <canvas id="valueByCategory"></canvas>
+                        <div id="categoryValueTable" style="margin-top: 20px; max-height: 300px; overflow-y: auto;"></div>
+                    </div>
 
+                    <!-- Value by Location -->
+                    <div class="chart-card">
+                        <h3><i class="fas fa-map-marker-alt"></i> มูลค่าแยกตามสถานที่</h3>
+                        <canvas id="valueByLocation"></canvas>
+                        <div id="locationValueTable" style="margin-top: 20px; max-height: 300px; overflow-y: auto;"></div>
+                    </div>
+
+                    <!-- Value by Department -->
+                    <div class="chart-card">
+                        <h3><i class="fas fa-building"></i> มูลค่าแยกตามแผนก</h3>
+                        <canvas id="valueByDepartment"></canvas>
+                        <div id="departmentValueTable" style="margin-top: 20px; max-height: 300px; overflow-y: auto;"></div>
+                    </div>
+
+                    <!-- Value by Status -->
+                    <div class="chart-card">
+                        <h3><i class="fas fa-signal"></i> มูลค่าแยกตามสถานะ</h3>
+                        <canvas id="valueByStatus"></canvas>
+                        <div id="statusValueTable" style="margin-top: 20px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Assets -->
+            <div style="margin-top: 30px;">
+                <div class="table-container">
+                    <h2 style="margin-bottom: 20px;">
+                        <i class="fas fa-trophy"></i> Top 10 ทรัพย์สินมูลค่าสูงสุด
+                    </h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">อันดับ</th>
+                                <th>รหัส</th>
+                                <th>ชื่อทรัพย์สิน</th>
+                                <th>หมวดหมู่</th>
+                                <th>สถานที่</th>
+                                <th>แผนก</th>
+                                <th>มูลค่า (฿)</th>
+                                <th>สถานะ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="topAssetsTable">
+                            <tr>
+                                <td colspan="8" style="text-align: center; padding: 40px; color: #aaa;">
+                                    ไม่มีข้อมูล
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Quantity Analysis -->
+            <div style="margin-top: 30px;">
+                <h2 style="margin-bottom: 20px;">
+                    <i class="fas fa-chart-bar"></i> การวิเคราะห์จำนวนทรัพย์สิน
+                </h2>
+                
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3><i class="fas fa-layer-group"></i> จำนวนแยกตามหมวดหมู่</h3>
+                        <canvas id="countByCategory"></canvas>
+                    </div>
+
+                    <div class="chart-card">
+                        <h3><i class="fas fa-chart-pie"></i> สัดส่วนสถานะ</h3>
+                        <canvas id="statusPieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trend Analysis -->
+            <div style="margin-top: 30px;">
                 <div class="chart-card">
-                    <h2><i class="fas fa-chart-pie"></i> สัดส่วนสถานะทรัพย์สิน</h2>
-                    <canvas id="statusChart"></canvas>
+                    <h2 style="margin-bottom: 20px;">
+                        <i class="fas fa-chart-line"></i> แนวโน้มการเพิ่มทรัพย์สินรายเดือน
+                    </h2>
+                    <canvas id="trendChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+
+            <!-- Detailed Statistics Table -->
+            <div style="margin-top: 30px;">
+                <div class="table-container">
+                    <h2 style="margin-bottom: 20px;">
+                        <i class="fas fa-table"></i> ตารางสถิติโดยละเอียด
+                    </h2>
+                    
+                    <div style="overflow-x: auto;">
+                        <table id="detailedStatsTable">
+                            <thead>
+                                <tr>
+                                    <th>กลุ่ม</th>
+                                    <th>จำนวน</th>
+                                    <th>%</th>
+                                    <th>มูลค่ารวม</th>
+                                    <th>มูลค่าเฉลี่ย</th>
+                                    <th>สูงสุด</th>
+                                    <th>ต่ำสุด</th>
+                                    <th>สมบูรณ์</th>
+                                    <th>ส่งซ่อม</th>
+                                    <th>ชำรุด</th>
+                                    <th>เสีย</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detailedStatsBody">
+                                <tr>
+                                    <td colspan="11" style="text-align: center; padding: 40px; color: #aaa;">
+                                        ไม่มีข้อมูล
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary Report -->
+            <div style="margin-top: 30px;">
+                <div class="table-container" style="background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%); border-left: 4px solid var(--primary);">
+                    <h2 style="margin-bottom: 20px; color: var(--primary);">
+                        <i class="fas fa-file-alt"></i> สรุปรายงาน
+                    </h2>
+                    <div id="summaryReport" style="line-height: 2;">
+                        <!-- จะถูกสร้างโดย JavaScript -->
+                    </div>
                 </div>
             </div>
         </div>
@@ -1745,6 +1955,88 @@
                     <i class="fas fa-save"></i>
                     บันทึกการเปลี่ยนแปลงทั้งหมด
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Code Modal -->
+    <div id="qrModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-qrcode"></i> QR Code - ทรัพย์สิน</h2>
+                <button class="close-btn" onclick="closeModal('qrModal')">&times;</button>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <h3 id="qrAssetName" style="color: var(--primary); margin-bottom: 10px;"></h3>
+                <p id="qrAssetCode" style="color: #666; margin-bottom: 20px;"></p>
+                <div id="qrcodeContainer" style="display: flex; justify-content: center; margin: 20px 0;"></div>
+                <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+                    <button class="btn btn-primary" onclick="downloadQRCode()">
+                        <i class="fas fa-download"></i> ดาวน์โหลด QR Code
+                    </button>
+                    <button class="btn btn-info" onclick="printQRCode()">
+                        <i class="fas fa-print"></i> พิมพ์ QR Code
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transfer Asset Modal -->
+    <div id="transferModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-exchange-alt"></i> โอนย้ายทรัพย์สิน</h2>
+                <button class="close-btn" onclick="closeModal('transferModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="transferAssetId">
+                
+                <div class="form-group">
+                    <label><strong>ทรัพย์สิน:</strong></label>
+                    <p id="transferAssetInfo" style="color: var(--primary); font-weight: 600;"></p>
+                </div>
+
+                <div class="form-group">
+                    <label><strong>ข้อมูลปัจจุบัน:</strong></label>
+                    <div style="background: #f0f9f9; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                        <p><i class="fas fa-map-marker-alt"></i> สถานที่: <span id="currentLocation"></span></p>
+                        <p><i class="fas fa-building"></i> แผนก: <span id="currentDepartment"></span></p>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>โอนย้ายไปสถานที่ <span class="required">*</span></label>
+                        <input type="text" id="newLocation" list="locationList" placeholder="เลือกหรือพิมพ์สถานที่ใหม่" required>
+                        <datalist id="locationList"></datalist>
+                    </div>
+
+                    <div class="form-group">
+                        <label>โอนย้ายไปแผนก <span class="required">*</span></label>
+                        <input type="text" id="newDepartment" list="departmentList" placeholder="เลือกหรือพิมพ์แผนกใหม่" required>
+                        <datalist id="departmentList"></datalist>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>เหตุผลในการโอนย้าย <span class="required">*</span></label>
+                    <textarea id="transferReason" rows="3" placeholder="ระบุเหตุผล..." required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>หมายเหตุ</label>
+                    <textarea id="transferNote" rows="2" placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)"></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn btn-secondary" onclick="closeModal('transferModal')">
+                        <i class="fas fa-times"></i> ยกเลิก
+                    </button>
+                    <button class="btn btn-success" onclick="confirmTransfer()">
+                        <i class="fas fa-check"></i> ยืนยันการโอนย้าย
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -2147,7 +2439,7 @@
                 return;
             }
             
-            tbody.innerHTML = assetsData.map(asset => `
+            tbody.innerHTML = assetsData.map((asset, index) => `
                 <tr>
                     <td>${asset.code}</td>
                     <td>${asset.name}</td>
@@ -2156,10 +2448,19 @@
                     <td>${asset.department || '-'}</td>
                     <td><span class="badge ${getStatusClass(asset.status)}">${asset.status}</span></td>
                     <td>${Number(asset.price).toLocaleString()}</td>
-                    <td>
-                        <button class="action-btn view"><i class="fas fa-eye"></i></button>
-                        <button class="action-btn edit"><i class="fas fa-edit"></i></button>
-                        <button class="action-btn delete" onclick="deleteAsset('${asset.code}')"><i class="fas fa-trash"></i></button>
+                    <td style="white-space: nowrap;">
+                        <button class="action-btn view" onclick="showQRCode(${index})" title="QR Code">
+                            <i class="fas fa-qrcode"></i>
+                        </button>
+                        <button class="action-btn primary" onclick="showTransferModal(${index})" title="โอนย้าย">
+                            <i class="fas fa-exchange-alt"></i>
+                        </button>
+                        <button class="action-btn edit" title="แก้ไข">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="action-btn delete" onclick="deleteAsset('${asset.code}')" title="ลบ">
+                            <i class="fas fa-trash"></i>
+                        </button>
                     </td>
                 </tr>
             `).join('');
@@ -2269,6 +2570,294 @@
             showNotification('✅ ลบทรัพย์สินสำเร็จ!', 'success');
             renderAssetsTable();
             updateDashboard();
+        }
+
+        // ========================================
+        // 🔷 QR Code Functions
+        // ========================================
+        let currentQRAsset = null;
+
+        function showQRCode(index) {
+            currentQRAsset = assetsData[index];
+            
+            document.getElementById('qrAssetName').textContent = currentQRAsset.name;
+            document.getElementById('qrAssetCode').textContent = `รหัส: ${currentQRAsset.code}`;
+            
+            // ล้าง QR Code เก่า
+            const container = document.getElementById('qrcodeContainer');
+            container.innerHTML = '';
+            
+            // สร้าง QR Code ใหม่
+            const qrData = JSON.stringify({
+                code: currentQRAsset.code,
+                name: currentQRAsset.name,
+                category: currentQRAsset.category,
+                location: currentQRAsset.location,
+                department: currentQRAsset.department,
+                status: currentQRAsset.status
+            });
+            
+            new QRCode(container, {
+                text: qrData,
+                width: 256,
+                height: 256,
+                colorDark: "#14b8a6",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            
+            openModal('qrModal');
+        }
+
+        function downloadQRCode() {
+            if (!currentQRAsset) return;
+            
+            const canvas = document.querySelector('#qrcodeContainer canvas');
+            if (!canvas) {
+                showNotification('❌ ไม่พบ QR Code', 'error');
+                return;
+            }
+            
+            const link = document.createElement('a');
+            link.download = `QR_${currentQRAsset.code}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+            
+            showNotification('✅ ดาวน์โหลด QR Code สำเร็จ!', 'success');
+        }
+
+        function printQRCode() {
+            if (!currentQRAsset) return;
+            
+            const printWindow = window.open('', '', 'width=600,height=600');
+            const canvas = document.querySelector('#qrcodeContainer canvas');
+            
+            if (!canvas) {
+                showNotification('❌ ไม่พบ QR Code', 'error');
+                return;
+            }
+            
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>พิมพ์ QR Code - ${currentQRAsset.code}</title>
+                    <style>
+                        body { 
+                            font-family: 'Prompt', sans-serif; 
+                            text-align: center; 
+                            padding: 50px;
+                        }
+                        h2 { color: #14b8a6; margin-bottom: 10px; }
+                        p { color: #666; margin-bottom: 20px; }
+                        img { border: 2px solid #14b8a6; padding: 10px; }
+                    </style>
+                </head>
+                <body>
+                    <h2>${currentQRAsset.name}</h2>
+                    <p>รหัส: ${currentQRAsset.code}</p>
+                    <img src="${canvas.toDataURL()}" />
+                    <p style="margin-top: 20px;">สถานที่: ${currentQRAsset.location}</p>
+                    <p>แผนก: ${currentQRAsset.department || '-'}</p>
+                </body>
+                </html>
+            `);
+            
+            printWindow.document.close();
+            printWindow.focus();
+            
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 250);
+        }
+
+        // ========================================
+        // 🔄 Transfer Functions
+        // ========================================
+        let transferHistory = JSON.parse(localStorage.getItem('fmcgTransferHistory') || '[]');
+
+        function showTransferModal(index) {
+            const asset = assetsData[index];
+            
+            document.getElementById('transferAssetId').value = index;
+            document.getElementById('transferAssetInfo').textContent = `${asset.code} - ${asset.name}`;
+            document.getElementById('currentLocation').textContent = asset.location || '-';
+            document.getElementById('currentDepartment').textContent = asset.department || '-';
+            
+            // ล้างฟอร์ม
+            document.getElementById('newLocation').value = '';
+            document.getElementById('newDepartment').value = '';
+            document.getElementById('transferReason').value = '';
+            document.getElementById('transferNote').value = '';
+            
+            // สร้าง datalist สำหรับ locations และ departments
+            populateDatalist();
+            
+            openModal('transferModal');
+        }
+
+        function populateDatalist() {
+            // Locations
+            const locations = [...new Set(assetsData.map(a => a.location).filter(Boolean))];
+            const locationList = document.getElementById('locationList');
+            locationList.innerHTML = locations.map(loc => `<option value="${loc}">`).join('');
+            
+            // Departments
+            const departments = [...new Set(assetsData.map(a => a.department).filter(Boolean))];
+            const departmentList = document.getElementById('departmentList');
+            departmentList.innerHTML = departments.map(dept => `<option value="${dept}">`).join('');
+        }
+
+        function confirmTransfer() {
+            const index = parseInt(document.getElementById('transferAssetId').value);
+            const newLocation = document.getElementById('newLocation').value.trim();
+            const newDepartment = document.getElementById('newDepartment').value.trim();
+            const reason = document.getElementById('transferReason').value.trim();
+            const note = document.getElementById('transferNote').value.trim();
+            
+            if (!newLocation || !newDepartment || !reason) {
+                showNotification('⚠️ กรุณากรอกข้อมูลให้ครบถ้วน', 'warning');
+                return;
+            }
+            
+            const asset = assetsData[index];
+            const oldLocation = asset.location;
+            const oldDepartment = asset.department;
+            
+            // บันทึกประวัติการโอนย้าย
+            const transfer = {
+                assetCode: asset.code,
+                assetName: asset.name,
+                fromLocation: oldLocation,
+                toLocation: newLocation,
+                fromDepartment: oldDepartment,
+                toDepartment: newDepartment,
+                reason: reason,
+                note: note,
+                transferDate: new Date().toISOString(),
+                transferBy: 'Admin' // TODO: เพิ่ม user authentication
+            };
+            
+            transferHistory.unshift(transfer);
+            localStorage.setItem('fmcgTransferHistory', JSON.stringify(transferHistory));
+            
+            // อัปเดตข้อมูลทรัพย์สิน
+            assetsData[index].location = newLocation;
+            assetsData[index].department = newDepartment;
+            localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
+            
+            closeModal('transferModal');
+            showNotification('✅ โอนย้ายทรัพย์สินสำเร็จ!', 'success');
+            
+            renderAssetsTable();
+            updateDashboard();
+            updateDepartmentPage();
+            updateLocationsPage();
+        }
+
+        // ========================================
+        // 📊 Import Excel Functions
+        // ========================================
+        function showImportSection() {
+            document.getElementById('importSection').style.display = 'block';
+            document.getElementById('importSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function hideImportSection() {
+            document.getElementById('importSection').style.display = 'none';
+        }
+
+        function processExcelFile() {
+            const fileInput = document.getElementById('excelFileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showNotification('⚠️ กรุณาเลือกไฟล์ Excel', 'warning');
+                return;
+            }
+            
+            showLoading();
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                    
+                    if (jsonData.length === 0) {
+                        throw new Error('ไม่พบข้อมูลในไฟล์');
+                    }
+                    
+                    // แปลงข้อมูลและเพิ่มเข้าระบบ
+                    let addedCount = 0;
+                    let skippedCount = 0;
+                    
+                    jsonData.forEach(row => {
+                        const code = row['รหัสทรัพย์สิน'] || row['code'] || '';
+                        const name = row['ชื่อทรัพย์สิน'] || row['name'] || '';
+                        
+                        if (!code || !name) {
+                            skippedCount++;
+                            return;
+                        }
+                        
+                        // ตรวจสอบว่ามีรหัสซ้ำหรือไม่
+                        if (assetsData.find(a => a.code === code)) {
+                            skippedCount++;
+                            return;
+                        }
+                        
+                        const newAsset = {
+                            code: code,
+                            name: name,
+                            category: row['หมวดหมู่'] || row['category'] || '',
+                            brand: row['ยี่ห้อ'] || row['brand'] || '',
+                            model: row['รุ่น'] || row['model'] || '',
+                            serial: row['Serial Number'] || row['serial'] || '',
+                            purchaseDate: row['วันที่ซื้อ'] || row['purchaseDate'] || '',
+                            price: parseFloat(row['ราคาซื้อ'] || row['price'] || 0),
+                            location: row['สถานที่เก็บ'] || row['location'] || '',
+                            department: row['แผนก'] || row['department'] || '',
+                            status: row['สถานะ'] || row['status'] || 'สมบูรณ์',
+                            description: row['คำอธิบาย'] || row['description'] || '',
+                            createdAt: new Date().toISOString()
+                        };
+                        
+                        assetsData.push(newAsset);
+                        addedCount++;
+                    });
+                    
+                    localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
+                    
+                    hideLoading();
+                    hideImportSection();
+                    
+                    showNotification(`✅ Import สำเร็จ! เพิ่ม ${addedCount} รายการ${skippedCount > 0 ? `, ข้าม ${skippedCount} รายการ` : ''}`, 'success');
+                    
+                    renderAssetsTable();
+                    updateDashboard();
+                    fileInput.value = '';
+                    
+                } catch (error) {
+                    hideLoading();
+                    showNotification('❌ เกิดข้อผิดพลาด: ' + error.message, 'error');
+                }
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        // ========================================
+        // 🎯 Modal Functions
+        // ========================================
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
         }
 
         // Download Template
@@ -3033,34 +3622,660 @@
         }
 
         // Update Reports Page with Real Data
+        // ========================================
+        // 📊 Enhanced Reports Functions
+        // ========================================
+        
+        let reportCharts = {};
+        let reportDateRange = { start: null, end: null };
+
         function updateReportsPage() {
-            if (assetsData.length === 0) return;
+            if (assetsData.length === 0) {
+                showNotification('⚠️ ไม่มีข้อมูลทรัพย์สิน', 'warning');
+                return;
+            }
 
-            // Calculate real values
-            const totalValue = assetsData.reduce((sum, asset) => sum + (Number(asset.price) || 0), 0);
-            const depreciation = totalValue * 0.15; // 15% depreciation
-            const maintenanceCost = assetsData
-                .filter(a => a.status === 'ส่งซ่อม' || a.status === 'ชำรุด')
-                .reduce((sum, a) => sum + (Number(a.price) * 0.1), 0);
-            const completeCount = assetsData.filter(a => a.status === 'สมบูรณ์').length;
-            const usageRate = assetsData.length > 0 ? Math.round((completeCount / assetsData.length) * 100) : 0;
+            // Get filtered data
+            const filteredData = getFilteredReportData();
+            
+            // Update summary stats
+            updateReportSummaryStats(filteredData);
+            
+            // Update all charts
+            updateValueBreakdownCharts(filteredData);
+            updateQuantityCharts(filteredData);
+            updateTrendChart(filteredData);
+            updateTopAssetsTable(filteredData);
+            updateDetailedStatsTable(filteredData);
+            updateSummaryReport(filteredData);
+        }
 
-            // Format large numbers
-            const formatValue = (value) => {
-                if (value >= 1000000) {
-                    return '฿' + (value / 1000000).toFixed(1) + 'M';
-                } else if (value >= 1000) {
-                    return '฿' + Math.round(value / 1000) + 'K';
-                } else {
-                    return '฿' + Math.round(value);
+        function getFilteredReportData() {
+            let filtered = [...assetsData];
+            
+            // Filter by date range
+            if (reportDateRange.start && reportDateRange.end) {
+                const startDate = new Date(reportDateRange.start);
+                const endDate = new Date(reportDateRange.end);
+                endDate.setHours(23, 59, 59);
+                
+                filtered = filtered.filter(asset => {
+                    const assetDate = new Date(asset.createdAt || asset.purchaseDate);
+                    return assetDate >= startDate && assetDate <= endDate;
+                });
+            }
+            
+            return filtered;
+        }
+
+        function updateReportSummaryStats(data) {
+            const totalAssets = data.length;
+            const totalValue = data.reduce((sum, a) => sum + (Number(a.price) || 0), 0);
+            const avgValue = totalAssets > 0 ? totalValue / totalAssets : 0;
+            const depreciation = totalValue * 0.15;
+            const netValue = totalValue - depreciation;
+            
+            // Update display
+            document.getElementById('reportTotalAssets').textContent = totalAssets.toLocaleString();
+            document.getElementById('reportTotalValue').textContent = formatCurrency(totalValue);
+            document.getElementById('reportAvgValue').textContent = formatCurrency(avgValue);
+            document.getElementById('reportDepreciation').textContent = formatCurrency(depreciation);
+            
+            // Show change indicators (if comparing to previous period)
+            // This can be enhanced later
+        }
+
+        function updateValueBreakdownCharts(data) {
+            const groupBy = document.getElementById('reportGroupBy')?.value || 'category';
+            
+            // Group data
+            const grouped = {};
+            data.forEach(asset => {
+                const key = asset[groupBy] || 'ไม่ระบุ';
+                if (!grouped[key]) {
+                    grouped[key] = { count: 0, value: 0, items: [] };
                 }
-            };
+                grouped[key].count++;
+                grouped[key].value += Number(asset.price) || 0;
+                grouped[key].items.push(asset);
+            });
+            
+            // Sort by value
+            const sorted = Object.entries(grouped).sort((a, b) => b[1].value - a[1].value);
+            
+            // Update Category Chart
+            updateValueChart('valueByCategory', sorted, 'มูลค่าแยกตามหมวดหมู่');
+            updateValueTable('categoryValueTable', sorted);
+            
+            // Update other charts if needed
+            if (groupBy === 'category') {
+                updateLocationValueChart(data);
+                updateDepartmentValueChart(data);
+                updateStatusValueChart(data);
+            }
+        }
 
-            // Update stats
-            document.getElementById('totalValue').textContent = formatValue(totalValue);
-            document.getElementById('depreciationValue').textContent = formatValue(depreciation);
-            document.getElementById('maintenanceValueReport').textContent = formatValue(maintenanceCost);
-            document.getElementById('usageRate').textContent = usageRate + '%';
+        function updateValueChart(canvasId, data, title) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+            
+            // Destroy existing chart
+            if (reportCharts[canvasId]) {
+                reportCharts[canvasId].destroy();
+            }
+            
+            const labels = data.map(d => d[0]);
+            const values = data.map(d => d[1].value);
+            
+            reportCharts[canvasId] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'มูลค่า (฿)',
+                        data: values,
+                        backgroundColor: 'rgba(20, 184, 166, 0.8)',
+                        borderColor: 'rgba(20, 184, 166, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return formatCurrency(context.parsed.y);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return formatCurrencyShort(value);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateValueTable(tableId, data) {
+            const container = document.getElementById(tableId);
+            if (!container) return;
+            
+            const total = data.reduce((sum, d) => sum + d[1].value, 0);
+            
+            container.innerHTML = `
+                <table style="width: 100%; font-size: 13px;">
+                    <thead style="background: #f0f9f9;">
+                        <tr>
+                            <th style="padding: 8px; text-align: left;">รายการ</th>
+                            <th style="padding: 8px; text-align: right;">จำนวน</th>
+                            <th style="padding: 8px; text-align: right;">มูลค่า</th>
+                            <th style="padding: 8px; text-align: right;">%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.map(([name, info]) => `
+                            <tr style="border-bottom: 1px solid #e5e5e5;">
+                                <td style="padding: 8px;">${name}</td>
+                                <td style="padding: 8px; text-align: right;">${info.count}</td>
+                                <td style="padding: 8px; text-align: right;">${formatCurrency(info.value)}</td>
+                                <td style="padding: 8px; text-align: right; color: var(--primary); font-weight: 600;">
+                                    ${((info.value / total) * 100).toFixed(1)}%
+                                </td>
+                            </tr>
+                        `).join('')}
+                        <tr style="background: #f0f9f9; font-weight: 600;">
+                            <td style="padding: 8px;">รวม</td>
+                            <td style="padding: 8px; text-align: right;">${data.reduce((s, d) => s + d[1].count, 0)}</td>
+                            <td style="padding: 8px; text-align: right;">${formatCurrency(total)}</td>
+                            <td style="padding: 8px; text-align: right;">100%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function updateLocationValueChart(data) {
+            const grouped = {};
+            data.forEach(asset => {
+                const key = asset.location || 'ไม่ระบุ';
+                if (!grouped[key]) grouped[key] = { count: 0, value: 0 };
+                grouped[key].count++;
+                grouped[key].value += Number(asset.price) || 0;
+            });
+            
+            const sorted = Object.entries(grouped).sort((a, b) => b[1].value - a[1].value);
+            updateValueChart('valueByLocation', sorted, 'มูลค่าแยกตามสถานที่');
+            updateValueTable('locationValueTable', sorted);
+        }
+
+        function updateDepartmentValueChart(data) {
+            const grouped = {};
+            data.forEach(asset => {
+                const key = asset.department || 'ไม่ระบุ';
+                if (!grouped[key]) grouped[key] = { count: 0, value: 0 };
+                grouped[key].count++;
+                grouped[key].value += Number(asset.price) || 0;
+            });
+            
+            const sorted = Object.entries(grouped).sort((a, b) => b[1].value - a[1].value);
+            updateValueChart('valueByDepartment', sorted, 'มูลค่าแยกตามแผนก');
+            updateValueTable('departmentValueTable', sorted);
+        }
+
+        function updateStatusValueChart(data) {
+            const grouped = {};
+            data.forEach(asset => {
+                const key = asset.status || 'ไม่ระบุ';
+                if (!grouped[key]) grouped[key] = { count: 0, value: 0 };
+                grouped[key].count++;
+                grouped[key].value += Number(asset.price) || 0;
+            });
+            
+            const sorted = Object.entries(grouped).sort((a, b) => b[1].value - a[1].value);
+            
+            const ctx = document.getElementById('valueByStatus');
+            if (!ctx) return;
+            
+            if (reportCharts['valueByStatus']) {
+                reportCharts['valueByStatus'].destroy();
+            }
+            
+            const colors = {
+                'สมบูรณ์': '#10b981',
+                'ส่งซ่อม': '#f59e0b',
+                'ชำรุด': '#ef4444',
+                'เสีย': '#991b1b'
+            };
+            
+            reportCharts['valueByStatus'] = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: sorted.map(d => d[0]),
+                    datasets: [{
+                        data: sorted.map(d => d[1].value),
+                        backgroundColor: sorted.map(d => colors[d[0]] || '#6b7280'),
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.label + ': ' + formatCurrency(context.parsed);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            updateValueTable('statusValueTable', sorted);
+        }
+
+        function updateQuantityCharts(data) {
+            // Count by category
+            const categoryCount = {};
+            data.forEach(asset => {
+                const cat = asset.category || 'ไม่ระบุ';
+                categoryCount[cat] = (categoryCount[cat] || 0) + 1;
+            });
+            
+            const sorted = Object.entries(categoryCount).sort((a, b) => b[1] - a[1]);
+            
+            const ctx1 = document.getElementById('countByCategory');
+            if (ctx1) {
+                if (reportCharts['countByCategory']) reportCharts['countByCategory'].destroy();
+                
+                reportCharts['countByCategory'] = new Chart(ctx1, {
+                    type: 'bar',
+                    data: {
+                        labels: sorted.map(d => d[0]),
+                        datasets: [{
+                            label: 'จำนวน',
+                            data: sorted.map(d => d[1]),
+                            backgroundColor: 'rgba(6, 182, 212, 0.8)',
+                            borderColor: 'rgba(6, 182, 212, 1)',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            }
+            
+            // Status pie chart
+            const statusCount = {};
+            data.forEach(asset => {
+                const status = asset.status || 'ไม่ระบุ';
+                statusCount[status] = (statusCount[status] || 0) + 1;
+            });
+            
+            const ctx2 = document.getElementById('statusPieChart');
+            if (ctx2) {
+                if (reportCharts['statusPieChart']) reportCharts['statusPieChart'].destroy();
+                
+                const colors = {
+                    'สมบูรณ์': '#10b981',
+                    'ส่งซ่อม': '#f59e0b',
+                    'ชำรุด': '#ef4444',
+                    'เสีย': '#991b1b'
+                };
+                
+                reportCharts['statusPieChart'] = new Chart(ctx2, {
+                    type: 'pie',
+                    data: {
+                        labels: Object.keys(statusCount),
+                        datasets: [{
+                            data: Object.values(statusCount),
+                            backgroundColor: Object.keys(statusCount).map(s => colors[s] || '#6b7280'),
+                            borderWidth: 2,
+                            borderColor: '#fff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { position: 'bottom' } }
+                    }
+                });
+            }
+        }
+
+        function updateTrendChart(data) {
+            // Group by month
+            const monthlyData = {};
+            data.forEach(asset => {
+                const date = new Date(asset.createdAt || asset.purchaseDate);
+                const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                monthlyData[monthKey] = (monthlyData[monthKey] || 0) + 1;
+            });
+            
+            const sorted = Object.entries(monthlyData).sort((a, b) => a[0].localeCompare(b[0]));
+            
+            const ctx = document.getElementById('trendChart');
+            if (!ctx) return;
+            
+            if (reportCharts['trendChart']) reportCharts['trendChart'].destroy();
+            
+            // Calculate cumulative
+            let cumulative = 0;
+            const cumulativeData = sorted.map(d => {
+                cumulative += d[1];
+                return cumulative;
+            });
+            
+            reportCharts['trendChart'] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: sorted.map(d => {
+                        const [year, month] = d[0].split('-');
+                        return `${month}/${year}`;
+                    }),
+                    datasets: [
+                        {
+                            label: 'เพิ่มในเดือน',
+                            data: sorted.map(d => d[1]),
+                            borderColor: 'rgba(16, 185, 129, 1)',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'สะสมรวม',
+                            data: cumulativeData,
+                            borderColor: 'rgba(20, 184, 166, 1)',
+                            backgroundColor: 'rgba(20, 184, 166, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function updateTopAssetsTable(data) {
+            const tbody = document.getElementById('topAssetsTable');
+            if (!tbody) return;
+            
+            const sorted = [...data].sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
+            const top10 = sorted.slice(0, 10);
+            
+            if (top10.length === 0) {
+                tbody.innerHTML = `
+                    <tr><td colspan="8" style="text-align: center; padding: 40px; color: #aaa;">ไม่มีข้อมูล</td></tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = top10.map((asset, index) => `
+                <tr>
+                    <td style="text-align: center; font-weight: 600;">
+                        <span style="display: inline-flex; align-items: center; justify-content: center; 
+                                     width: 30px; height: 30px; border-radius: 50%; 
+                                     background: ${index < 3 ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)' : '#e5e5e5'}; 
+                                     color: ${index < 3 ? 'white' : '#666'};">
+                            ${index + 1}
+                        </span>
+                    </td>
+                    <td>${asset.code}</td>
+                    <td>${asset.name}</td>
+                    <td>${asset.category}</td>
+                    <td>${asset.location}</td>
+                    <td>${asset.department || '-'}</td>
+                    <td style="font-weight: 600; color: var(--primary);">${formatCurrency(asset.price)}</td>
+                    <td><span class="badge ${getStatusClass(asset.status)}">${asset.status}</span></td>
+                </tr>
+            `).join('');
+        }
+
+        function updateDetailedStatsTable(data) {
+            const tbody = document.getElementById('detailedStatsBody');
+            if (!tbody) return;
+            
+            const groupBy = document.getElementById('reportGroupBy')?.value || 'category';
+            
+            // Group data
+            const grouped = {};
+            data.forEach(asset => {
+                const key = asset[groupBy] || 'ไม่ระบุ';
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        count: 0,
+                        value: 0,
+                        prices: [],
+                        สมบูรณ์: 0,
+                        'ส่งซ่อม': 0,
+                        ชำรุด: 0,
+                        เสีย: 0
+                    };
+                }
+                grouped[key].count++;
+                grouped[key].value += Number(asset.price) || 0;
+                grouped[key].prices.push(Number(asset.price) || 0);
+                grouped[key][asset.status]++;
+            });
+            
+            const total = data.length;
+            const sorted = Object.entries(grouped).sort((a, b) => b[1].value - a[1].value);
+            
+            tbody.innerHTML = sorted.map(([name, stats]) => {
+                const avg = stats.count > 0 ? stats.value / stats.count : 0;
+                const max = Math.max(...stats.prices);
+                const min = Math.min(...stats.prices);
+                const percent = ((stats.count / total) * 100).toFixed(1);
+                
+                return `
+                    <tr>
+                        <td style="font-weight: 600;">${name}</td>
+                        <td style="text-align: right;">${stats.count}</td>
+                        <td style="text-align: right; color: var(--primary);">${percent}%</td>
+                        <td style="text-align: right; font-weight: 600;">${formatCurrency(stats.value)}</td>
+                        <td style="text-align: right;">${formatCurrency(avg)}</td>
+                        <td style="text-align: right; color: #10b981;">${formatCurrency(max)}</td>
+                        <td style="text-align: right; color: #ef4444;">${formatCurrency(min)}</td>
+                        <td style="text-align: right;">${stats.สมบูรณ์ || 0}</td>
+                        <td style="text-align: right;">${stats['ส่งซ่อม'] || 0}</td>
+                        <td style="text-align: right;">${stats.ชำรุด || 0}</td>
+                        <td style="text-align: right;">${stats.เสีย || 0}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updateSummaryReport(data) {
+            const container = document.getElementById('summaryReport');
+            if (!container) return;
+            
+            const totalAssets = data.length;
+            const totalValue = data.reduce((sum, a) => sum + (Number(a.price) || 0), 0);
+            const avgValue = totalAssets > 0 ? totalValue / totalAssets : 0;
+            
+            const statusCount = {};
+            data.forEach(a => {
+                statusCount[a.status] = (statusCount[a.status] || 0) + 1;
+            });
+            
+            const categories = [...new Set(data.map(a => a.category))].length;
+            const locations = [...new Set(data.map(a => a.location))].length;
+            const departments = [...new Set(data.map(a => a.department).filter(Boolean))].length;
+            
+            const depreciation = totalValue * 0.15;
+            const netValue = totalValue - depreciation;
+            
+            const dateRange = reportDateRange.start && reportDateRange.end 
+                ? `ช่วงเวลา: ${formatThaiDate(reportDateRange.start)} - ${formatThaiDate(reportDateRange.end)}`
+                : 'ทั้งหมด';
+            
+            container.innerHTML = `
+                <p><strong>📅 ${dateRange}</strong></p>
+                <p>📦 จำนวนทรัพย์สินทั้งหมด: <strong>${totalAssets.toLocaleString()}</strong> รายการ</p>
+                <p>💰 มูลค่ารวม: <strong>${formatCurrency(totalValue)}</strong></p>
+                <p>📊 มูลค่าเฉลี่ย: <strong>${formatCurrency(avgValue)}</strong> ต่อชิ้น</p>
+                <p>📉 ค่าเสื่อมราคา (15%): <strong>${formatCurrency(depreciation)}</strong></p>
+                <p>💎 มูลค่าสุทธิ: <strong style="color: var(--primary);">${formatCurrency(netValue)}</strong></p>
+                <hr style="margin: 15px 0; border: none; border-top: 1px solid #ccc;">
+                <p>🏷️ จำนวนหมวดหมู่: <strong>${categories}</strong> หมวด</p>
+                <p>📍 จำนวนสถานที่: <strong>${locations}</strong> แห่ง</p>
+                <p>🏢 จำนวนแผนก: <strong>${departments}</strong> แผนก</p>
+                <hr style="margin: 15px 0; border: none; border-top: 1px solid #ccc;">
+                <p>✅ สมบูรณ์: <strong>${statusCount['สมบูรณ์'] || 0}</strong> (${((statusCount['สมบูรณ์'] || 0) / totalAssets * 100).toFixed(1)}%)</p>
+                <p>🔧 ส่งซ่อม: <strong>${statusCount['ส่งซ่อม'] || 0}</strong> (${((statusCount['ส่งซ่อม'] || 0) / totalAssets * 100).toFixed(1)}%)</p>
+                <p>⚠️ ชำรุด: <strong>${statusCount['ชำรุด'] || 0}</strong> (${((statusCount['ชำรุด'] || 0) / totalAssets * 100).toFixed(1)}%)</p>
+                <p>❌ เสีย: <strong>${statusCount['เสีย'] || 0}</strong> (${((statusCount['เสีย'] || 0) / totalAssets * 100).toFixed(1)}%)</p>
+            `;
+        }
+
+        // Date Range Functions
+        function applyQuickDateRange() {
+            const select = document.getElementById('quickDateRange');
+            const range = select.value;
+            
+            const today = new Date();
+            let startDate, endDate;
+            
+            switch(range) {
+                case 'today':
+                    startDate = endDate = today;
+                    break;
+                case 'week':
+                    startDate = new Date(today);
+                    startDate.setDate(today.getDate() - 7);
+                    endDate = today;
+                    break;
+                case 'month':
+                    startDate = new Date(today);
+                    startDate.setDate(today.getDate() - 30);
+                    endDate = today;
+                    break;
+                case 'quarter':
+                    startDate = new Date(today);
+                    startDate.setMonth(today.getMonth() - 3);
+                    endDate = today;
+                    break;
+                case 'year':
+                    startDate = new Date(today.getFullYear(), 0, 1);
+                    endDate = today;
+                    break;
+                case 'all':
+                    startDate = null;
+                    endDate = null;
+                    break;
+            }
+            
+            if (startDate) {
+                document.getElementById('reportStartDate').value = startDate.toISOString().split('T')[0];
+                document.getElementById('reportEndDate').value = endDate.toISOString().split('T')[0];
+                reportDateRange.start = startDate.toISOString().split('T')[0];
+                reportDateRange.end = endDate.toISOString().split('T')[0];
+            } else {
+                document.getElementById('reportStartDate').value = '';
+                document.getElementById('reportEndDate').value = '';
+                reportDateRange.start = null;
+                reportDateRange.end = null;
+            }
+            
+            updateReportsPage();
+        }
+
+        function updateReportsByDateRange() {
+            const start = document.getElementById('reportStartDate').value;
+            const end = document.getElementById('reportEndDate').value;
+            
+            reportDateRange.start = start;
+            reportDateRange.end = end;
+            
+            updateReportsPage();
+        }
+
+        function refreshReports() {
+            updateReportsPage();
+            showNotification('✅ รีเฟรชรายงานสำเร็จ!', 'success');
+        }
+
+        function exportDetailedReport() {
+            if (assetsData.length === 0) {
+                showNotification('ไม่มีข้อมูลให้ Export', 'warning');
+                return;
+            }
+            
+            const data = getFilteredReportData();
+            
+            // Prepare data for export
+            const exportData = data.map(asset => ({
+                'รหัสทรัพย์สิน': asset.code,
+                'ชื่อทรัพย์สิน': asset.name,
+                'หมวดหมู่': asset.category,
+                'ยี่ห้อ': asset.brand,
+                'รุ่น': asset.model,
+                'Serial Number': asset.serial,
+                'วันที่ซื้อ': asset.purchaseDate,
+                'ราคาซื้อ': asset.price,
+                'สถานที่เก็บ': asset.location,
+                'แผนก': asset.department || '',
+                'สถานะ': asset.status,
+                'คำอธิบาย': asset.description,
+                'วันที่สร้าง': asset.createdAt
+            }));
+            
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Detailed Report');
+            
+            const dateStr = reportDateRange.start && reportDateRange.end
+                ? `_${reportDateRange.start}_to_${reportDateRange.end}`
+                : '';
+            
+            XLSX.writeFile(wb, `Detailed_Asset_Report${dateStr}_${new Date().toISOString().split('T')[0]}.xlsx`);
+            
+            showNotification('✅ Export รายงานสำเร็จ!', 'success');
+        }
+
+        // Utility Functions
+        function formatCurrency(value) {
+            return '฿' + Number(value).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        }
+
+        function formatCurrencyShort(value) {
+            if (value >= 1000000) {
+                return '฿' + (value / 1000000).toFixed(1) + 'M';
+            } else if (value >= 1000) {
+                return '฿' + (value / 1000).toFixed(0) + 'K';
+            }
+            return '฿' + value.toFixed(0);
+        }
+
+        function formatThaiDate(dateStr) {
+            const date = new Date(dateStr);
+            const day = date.getDate();
+            const month = date.getMonth() + 1;
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
         }
 
         // Load Data from Google Sheets
