@@ -3020,13 +3020,10 @@
                     <td><span class="badge ${getStatusClass(asset.status)}">${asset.status}</span></td>
                     <td>${Number(asset.price).toLocaleString()}</td>
                     <td style="white-space: nowrap;">
-                        <button class="action-btn view" onclick="showQRCode(${index})" title="QR Code">
-                            <i class="fas fa-qrcode"></i>
-                        </button>
                         <button class="action-btn primary" onclick="showTransferModal(${index})" title="โอนย้าย">
                             <i class="fas fa-exchange-alt"></i>
                         </button>
-                        <button class="action-btn edit" title="แก้ไข">
+                        <button class="action-btn edit" onclick="editAsset('${asset.code}')" title="แก้ไข">
                             <i class="fas fa-edit"></i>
                         </button>
                         <button class="action-btn delete" onclick="deleteAsset('${asset.code}')" title="ลบ">
