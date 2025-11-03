@@ -17,6 +17,7 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            font-family: 'Prompt', sans-serif;
         }
 
         body {
@@ -4386,6 +4387,15 @@
                 newLocationSelect.innerHTML = '<option value="">เลือกสถานที่</option>' +
                     locations.map(loc => `<option value="${loc}">${loc}</option>`).join('');
                 if (currentValue) newLocationSelect.value = currentValue;
+            }
+
+            // Update in edit asset form
+            const editLocationSelect = document.getElementById('editLocation');
+            if (editLocationSelect) {
+                const currentValue = editLocationSelect.value;
+                editLocationSelect.innerHTML = '<option value="">เลือกสถานที่</option>' +
+                    locations.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+                if (currentValue) editLocationSelect.value = currentValue;
             }
 
             // Update in stock count filter
