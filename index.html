@@ -1625,20 +1625,11 @@
                 
                 <div class="form-grid">
                     <div class="form-group full-width">
-                        <label>Google Sheets ID <span class="required">*</span></label>
-                        <input type="text" id="sheetsId" placeholder="1A2B3C4D5E6F7G8H9I0J...">
+                        <label>Google Apps Script Web App URL <span class="required">*</span></label>
+                        <input type="text" id="webAppUrl" placeholder="https://script.google.com/macros/s/...">
                         <small style="color: #666; margin-top: 5px; display: block;">
                             <i class="fas fa-info-circle"></i> 
-                            คัดลอก ID จาก URL ของ Google Sheets: https://docs.google.com/spreadsheets/d/<strong>[ID]</strong>/edit
-                        </small>
-                    </div>
-
-                    <div class="form-group full-width">
-                        <label>API Key</label>
-                        <input type="password" id="apiKey" placeholder="AIzaSyD...">
-                        <small style="color: #666; margin-top: 5px; display: block;">
-                            <i class="fas fa-info-circle"></i> 
-                            สร้าง API Key จาก Google Cloud Console
+                            Deploy Apps Script แล้ว copy Web app URL มาวางที่นี่
                         </small>
                     </div>
 
@@ -1726,8 +1717,7 @@
         let assetsData = [];
         let importData = [];
         let sheetsConfig = {
-            spreadsheetId: '',
-            apiKey: '',
+            webAppUrl: '',
             sheetName: 'Assets'
         };
 
@@ -2121,7 +2111,7 @@
                 localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
                 
                 // Save to Google Sheets if configured
-                if (sheetsConfig.spreadsheetId && sheetsConfig.apiKey) {
+                if (sheetsConfig.webAppUrl) {
                     await saveToGoogleSheets([asset]);
                 }
                 
@@ -2263,7 +2253,7 @@
                 localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
                 
                 // Save to Google Sheets if configured
-                if (sheetsConfig.spreadsheetId && sheetsConfig.apiKey) {
+                if (sheetsConfig.webAppUrl) {
                     await saveToGoogleSheets(importData);
                 }
                 
@@ -2880,37 +2870,31 @@
 
         // Load Data from Google Sheets
         async function loadFromGoogleSheets() {
-            const { spreadsheetId, apiKey, sheetName } = sheetsConfig;
+            const { webAppUrl } = sheetsConfig;
             
-            if (!spreadsheetId || !apiKey) {
-                showNotification('กรุณาตั้งค่า Google Sheets ก่อน', 'error');
+            if (!webAppUrl) {
+                showNotification('https://script.google.com/macros/s/AKfycbzcSH7cQ3kYiSvMkj49uounseXuUAwH6q2iFS85fZFV8FcwoC0X5ojPOJpRNt1PAuge/exec', 'error');
                 return;
             }
             
             showLoading();
             
             try {
-                // Get data from Google Sheets
-                const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
-                
-                const response = await fetch(url);
+                const response = await fetch(webAppUrl);
                 
                 if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error?.message || 'ไม่สามารถดึงข้อมูลจาก Google Sheets ได้');
+                    throw new Error('ไม่สามารถดึงข้อมูลได้');
                 }
                 
-                const data = await response.json();
-                const rows = data.values;
+                const result = await response.json();
                 
-                if (!rows || rows.length <= 1) {
+                if (!result.success || !result.data || result.data.length <= 1) {
                     hideLoading();
                     showNotification('⚠️ ไม่พบข้อมูลใน Google Sheets', 'warning');
                     return;
                 }
                 
-                // Parse data (skip header row)
-                const loadedAssets = rows.slice(1).map(row => ({
+                const loadedAssets = result.data.slice(1).map(row => ({
                     code: row[0] || '',
                     name: row[1] || '',
                     category: row[2] || '',
@@ -2924,14 +2908,13 @@
                     status: row[10] || 'สมบูรณ์',
                     description: row[11] || '',
                     createdAt: row[12] || new Date().toISOString()
-                })).filter(asset => asset.code && asset.name); // Filter out empty rows
+                })).filter(asset => asset.code && asset.name);
                 
-                // Update local data
                 assetsData = loadedAssets;
                 localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
                 
                 hideLoading();
-                showNotification(`✅ โหลดข้อมูล ${loadedAssets.length} รายการจาก Google Sheets สำเร็จ!`, 'success');
+                showNotification(`✅ โหลดข้อมูล ${loadedAssets.length} รายการสำเร็จ!`, 'success');
                 
                 updateDashboard();
                 renderAssetsTable();
@@ -2944,91 +2927,62 @@
 
         // Save to Google Sheets
         async function saveToGoogleSheets(assets) {
-            const { spreadsheetId, apiKey, sheetName } = sheetsConfig;
+            const { webAppUrl } = sheetsConfig;
             
-            if (!spreadsheetId || !apiKey) {
-                throw new Error('กรุณาตั้งค่า Google Sheets ก่อน');
+            if (!webAppUrl) {
+                throw new Error('https://script.google.com/macros/s/AKfycbzcSH7cQ3kYiSvMkj49uounseXuUAwH6q2iFS85fZFV8FcwoC0X5ojPOJpRNt1PAuge/exec');
             }
             
-            // Prepare data for Sheets
-            const values = assets.map(asset => [
-                asset.code,
-                asset.name,
-                asset.category,
-                asset.brand,
-                asset.model,
-                asset.serial,
-                asset.purchaseDate,
-                asset.price,
-                asset.location,
-                asset.department || '',
-                asset.status,
-                asset.description,
-                asset.createdAt
+            const rows = assets.map(asset => [
+                asset.code, asset.name, asset.category, asset.brand, asset.model,
+                asset.serial, asset.purchaseDate, asset.price, asset.location,
+                asset.department || '', asset.status, asset.description, asset.createdAt
             ]);
             
-            // Append to Google Sheets
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}:append?valueInputOption=RAW&key=${apiKey}`;
-            
-            const response = await fetch(url, {
+            const response = await fetch(webAppUrl, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify({
-                    values: values
+                    action: 'append',
+                    rows: rows
                 })
             });
             
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error?.message || 'ไม่สามารถบันทึกลง Google Sheets ได้');
+                throw new Error('ไม่สามารถบันทึกข้อมูลได้');
             }
             
-            return await response.json();
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || 'เกิดข้อผิดพลาดในการบันทึก');
+            }
+            
+            return result;
         }
 
         // Initialize Google Sheets with Headers
         async function initializeGoogleSheets() {
-            const { spreadsheetId, apiKey, sheetName } = sheetsConfig;
+            const { webAppUrl } = sheetsConfig;
             
-            if (!spreadsheetId || !apiKey) {
-                showNotification('กรุณาตั้งค่า Google Sheets ก่อน', 'warning');
+            if (!webAppUrl) {
+                showNotification('https://script.google.com/macros/s/AKfycbzcSH7cQ3kYiSvMkj49uounseXuUAwH6q2iFS85fZFV8FcwoC0X5ojPOJpRNt1PAuge/exec');
                 return;
             }
             
             showLoading();
             
             try {
-                // Check if sheet has data
-                const checkUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}!A1:M1?key=${apiKey}`;
-                const checkResponse = await fetch(checkUrl);
-                
-                if (checkResponse.ok) {
-                    const data = await checkResponse.json();
-                    if (data.values && data.values.length > 0) {
-                        hideLoading();
-                        showNotification('Sheet มีข้อมูลอยู่แล้ว', 'info');
-                        return;
-                    }
-                }
-                
-                // Add headers
                 const headers = [
                     'รหัสทรัพย์สิน', 'ชื่อทรัพย์สิน', 'หมวดหมู่', 'ยี่ห้อ', 'รุ่น', 
                     'Serial Number', 'วันที่ซื้อ', 'ราคาซื้อ', 'สถานที่เก็บ', 'แผนก', 'สถานะ', 
                     'คำอธิบาย', 'วันที่สร้าง'
                 ];
                 
-                const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}!A1:M1?valueInputOption=RAW&key=${apiKey}`;
-                
-                const response = await fetch(url, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                const response = await fetch(webAppUrl, {
+                    method: 'POST',
                     body: JSON.stringify({
-                        values: [headers]
+                        action: 'initialize',
+                        headers: headers
                     })
                 });
                 
@@ -3036,8 +2990,14 @@
                     throw new Error('ไม่สามารถสร้างหัวตารางได้');
                 }
                 
+                const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'เกิดข้อผิดพลาด');
+                }
+                
                 hideLoading();
-                showNotification('✅ สร้างหัวตารางใน Google Sheets สำเร็จ!', 'success');
+                showNotification('✅ สร้างหัวตารางสำเร็จ!', 'success');
                 
             } catch (error) {
                 hideLoading();
@@ -3047,29 +3007,25 @@
 
         // Test Connection
         async function testConnection() {
-            const spreadsheetId = document.getElementById('sheetsId').value;
-            const apiKey = document.getElementById('apiKey').value;
-            const sheetName = document.getElementById('sheetName').value || 'Assets';
+            const webAppUrl = document.getElementById('webAppUrl').value;
             
-            if (!spreadsheetId || !apiKey) {
-                showNotification('กรุณากรอก Sheets ID และ API Key', 'warning');
+            if (!webAppUrl) {
+                showNotification('https://script.google.com/macros/s/AKfycbzcSH7cQ3kYiSvMkj49uounseXuUAwH6q2iFS85fZFV8FcwoC0X5ojPOJpRNt1PAuge/exec', 'warning');
                 return;
             }
             
             showLoading();
             
             try {
-                const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?key=${apiKey}`;
-                const response = await fetch(url);
+                const response = await fetch(webAppUrl);
                 
                 if (!response.ok) {
-                    throw new Error('ไม่สามารถเชื่อมต่อได้ กรุณาตรวจสอบ ID และ API Key');
+                    throw new Error('ไม่สามารถเชื่อมต่อได้');
                 }
                 
                 const data = await response.json();
                 
-                // Save config
-                sheetsConfig = { spreadsheetId, apiKey, sheetName };
+                sheetsConfig = { webAppUrl, sheetName: 'Assets' };
                 localStorage.setItem('fmcgSheetsConfig', JSON.stringify(sheetsConfig));
                 
                 hideLoading();
@@ -3083,13 +3039,14 @@
                         <i class="fas fa-check-circle" style="font-size: 24px;"></i>
                         <div>
                             <strong>เชื่อมต่อสำเร็จ!</strong>
-                            <p style="margin-top: 5px;">Spreadsheet: ${data.properties.title}</p>
+                            <p style="margin-top: 5px;">พบข้อมูล ${data.data ? data.data.length - 1 : 0} รายการ</p>
                         </div>
                     </div>
                 `;
                 
                 updateSheetsStatus(true);
-                showNotification('✅ เชื่อมต่อ Google Sheets สำเร็จ!', 'success');
+                showNotification('✅ เชื่อมต่อ Google Apps Script สำเร็จ!', 'success');
+                
             } catch (error) {
                 hideLoading();
                 
@@ -3098,7 +3055,7 @@
                 resultDiv.style.background = '#fee2e2';
                 resultDiv.style.border = '1px solid #ef4444';
                 resultDiv.innerHTML = `
-                    <div style="display: flex; align-items: center; gap: 10px; color: #991b1b;">
+                    <div style="display: flex; align-items: start; gap: 10px; color: #991b1b;">
                         <i class="fas fa-times-circle" style="font-size: 24px;"></i>
                         <div>
                             <strong>เชื่อมต่อไม่สำเร็จ</strong>
@@ -3133,12 +3090,10 @@
 
         // Save Settings
         function saveSettings() {
-            const spreadsheetId = document.getElementById('sheetsId').value;
-            const apiKey = document.getElementById('apiKey').value;
-            const sheetName = document.getElementById('sheetName').value || 'Assets';
+            const webAppUrl = document.getElementById('webAppUrl').value;
             const companyName = document.getElementById('companyName').value;
             
-            sheetsConfig = { spreadsheetId, apiKey, sheetName };
+            sheetsConfig = { webAppUrl, sheetName: 'Assets' };
             localStorage.setItem('fmcgSheetsConfig', JSON.stringify(sheetsConfig));
             localStorage.setItem('fmcgCompanyName', companyName);
             
@@ -3220,8 +3175,7 @@
             const savedConfig = localStorage.getItem('fmcgSheetsConfig');
             if (savedConfig) {
                 sheetsConfig = JSON.parse(savedConfig);
-                document.getElementById('sheetsId').value = sheetsConfig.spreadsheetId;
-                document.getElementById('sheetName').value = sheetsConfig.sheetName;
+                document.getElementById('webAppUrl').value = sheetsConfig.webAppUrl;
                 updateSheetsStatus(true);
             }
             
