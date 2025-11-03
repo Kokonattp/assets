@@ -883,10 +883,6 @@
                         <i class="fas fa-plus"></i>
                         เพิ่มทรัพย์สิน
                     </button>
-                    <div class="user-profile">
-                        <div class="user-avatar">N</div>
-                        <span>Neverlending</span>
-                    </div>
                 </div>
             </div>
 
@@ -1710,35 +1706,30 @@
     </div>
 
     <script>
-        // Global Variables
-        let assetsData = [];
-        let importData = [];
-        
-        // ⚙️ ตั้งค่า Google Apps Script URL (สำหรับบันทึกข้อมูล)
-        const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcSH7cQ3kYiSvMkj49uounseXuUAwH6q2iFS85fZFV8FcwoC0X5ojPOJpRNt1PAuge/exec';
-        
-        // ⚙️ ตั้งค่า Google Sheets API (สำหรับอ่านข้อมูลแบบเร็ว - ถ้ามี)
-        const USE_SHEETS_API = true; // เปลี่ยนเป็น true ถ้าต้องการใช้ Sheets API
-        const SHEETS_API_KEY = 'AIzaSyCbId0_NCsmI84pl3vRJdqokZRHoMWHmCM';
-        const SPREADSHEET_ID = '1o_Wpre0DNfh5XNIEiWR-8uI3zCDaYxCysI5utuDDkBI';
-        const SHEET_NAME = 'Assets';
-        
-        let sheetsConfig = {
-            webAppUrl: GOOGLE_APPS_SCRIPT_URL,
-            sheetName: 'Assets'
-        };
-
+        // ⚠️ ฟังก์ชันสำคัญที่ต้องโหลดก่อน (สำหรับ onclick events)
         // Toggle Sidebar
         function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('collapsed');
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) {
+                sidebar.classList.toggle('collapsed');
+            }
         }
 
         // Page Navigation
         function showPage(pageId) {
+            // รอให้ DOM โหลดเสร็จก่อน
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => showPage(pageId));
+                return;
+            }
+            
             const pages = document.querySelectorAll('.page');
             pages.forEach(page => page.classList.remove('active'));
             
-            document.getElementById(pageId).classList.add('active');
+            const targetPage = document.getElementById(pageId);
+            if (targetPage) {
+                targetPage.classList.add('active');
+            }
             
             const menuItems = document.querySelectorAll('.menu-item');
             menuItems.forEach(item => item.classList.remove('active'));
@@ -1750,27 +1741,50 @@
                 clickedMenu.classList.add('active');
             }
             
+            // อัปเดตข้อมูลตามหน้าที่เปิด
             if (pageId === 'dashboard') {
-                setTimeout(initDashboardCharts, 100);
-                updateDashboard();
+                setTimeout(() => {
+                    if (typeof initDashboardCharts === 'function') initDashboardCharts();
+                    if (typeof updateDashboard === 'function') updateDashboard();
+                }, 100);
             }
             if (pageId === 'reports') {
-                setTimeout(initReportCharts, 100);
-                updateReportsPage();
+                setTimeout(() => {
+                    if (typeof initReportCharts === 'function') initReportCharts();
+                    if (typeof updateReportsPage === 'function') updateReportsPage();
+                }, 100);
             }
             if (pageId === 'assets') {
-                renderAssetsTable();
+                if (typeof renderAssetsTable === 'function') renderAssetsTable();
             }
             if (pageId === 'departments') {
-                updateDepartmentPage();
+                if (typeof updateDepartmentPage === 'function') updateDepartmentPage();
             }
             if (pageId === 'locations') {
-                updateLocationsPage();
+                if (typeof updateLocationsPage === 'function') updateLocationsPage();
             }
             if (pageId === 'maintenance') {
-                updateMaintenancePage();
+                if (typeof updateMaintenancePage === 'function') updateMaintenancePage();
             }
         }
+
+        // Global Variables
+        let assetsData = [];
+        let importData = [];
+        
+        // ⚙️ ตั้งค่า Google Apps Script URL (สำหรับบันทึกข้อมูล)
+        const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcSH7cQ3kYiSvMkj49uounseXuUAwH6q2iFS85fZFV8FcwoC0X5ojPOJpRNt1PAuge/exec';
+        
+        // ⚙️ ตั้งค่า Google Sheets API (สำหรับอ่านข้อมูลแบบเร็ว - ถ้ามี)
+        const USE_SHEETS_API = false; // เปลี่ยนเป็น true ถ้าต้องการใช้ Sheets API
+        const SHEETS_API_KEY = 'YOUR_API_KEY_HERE';
+        const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
+        const SHEET_NAME = 'Assets';
+        
+        let sheetsConfig = {
+            webAppUrl: GOOGLE_APPS_SCRIPT_URL,
+            sheetName: 'Assets'
+        };
 
         // Initialize Dashboard Charts
         function initDashboardCharts() {
