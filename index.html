@@ -2192,86 +2192,80 @@
                     const workbook = XLSX.read(data, {
                         type: 'array',
                         cellDates: true,
-                        dateNF: 'yyyy-mm-dd'
+                        dateNF: 'yyyy-mm-dd',
+                        raw: false
                     });
                     
                     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet, {
+                        defval: '' // ค่า default สำหรับ cell ว่าง
+                    });
                     
-                    // อ่านข้อมูลโดยเริ่มจากแถวที่ 2 (skip header)
-                    const range = XLSX.utils.decode_range(firstSheet['!ref']);
-                    const jsonData = [];
+                    console.log('Raw data from Excel:', jsonData);
                     
-                    for (let row = 1; row <= range.e.r; row++) {
-                        const rowData = {};
-                        
-                        // อ่านข้อมูลแต่ละคอลัมน์
-                        rowData['รหัสทรัพย์สิน'] = firstSheet[`A${row + 1}`]?.v || '';
-                        rowData['ชื่อทรัพย์สิน'] = firstSheet[`B${row + 1}`]?.v || '';
-                        rowData['หมวดหมู่'] = firstSheet[`C${row + 1}`]?.v || '';
-                        rowData['ยี่ห้อ'] = firstSheet[`D${row + 1}`]?.v || '';
-                        rowData['รุ่น'] = firstSheet[`E${row + 1}`]?.v || '';
-                        rowData['Serial Number'] = firstSheet[`F${row + 1}`]?.v || '';
-                        
+                    importData = jsonData.map((row, index) => {
                         // จัดการวันที่
-                        const dateCell = firstSheet[`G${row + 1}`];
-                        if (dateCell) {
-                            if (dateCell.t === 'n') {
-                                // ถ้าเป็นตัวเลข (Excel date serial)
-                                const excelDate = new Date((dateCell.v - 25569) * 86400 * 1000);
-                                rowData['วันที่ซื้อ'] = excelDate.toISOString().split('T')[0];
-                            } else {
-                                rowData['วันที่ซื้อ'] = dateCell.v || '';
+                        let purchaseDate = '';
+                        const dateValue = row['วันที่ซื้อ'] || row['วันที่'];
+                        if (dateValue) {
+                            if (typeof dateValue === 'number') {
+                                const excelDate = new Date((dateValue - 25569) * 86400 * 1000);
+                                purchaseDate = excelDate.toISOString().split('T')[0];
+                            } else if (dateValue.includes('-')) {
+                                purchaseDate = dateValue;
+                            } else if (dateValue.includes('/')) {
+                                const parts = dateValue.split('/');
+                                if (parts.length === 3) {
+                                    purchaseDate = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+                                }
                             }
-                        } else {
-                            rowData['วันที่ซื้อ'] = '';
                         }
                         
-                        rowData['ราคาซื้อ'] = firstSheet[`H${row + 1}`]?.v || 0;
-                        rowData['สถานที่เก็บ'] = firstSheet[`I${row + 1}`]?.v || '';
-                        rowData['แผนก'] = firstSheet[`J${row + 1}`]?.v || '';
-                        rowData['สถานะ'] = firstSheet[`K${row + 1}`]?.v || 'สมบูรณ์';
-                        rowData['คำอธิบาย'] = firstSheet[`L${row + 1}`]?.v || '';
-                        
-                        // เช็คว่ามีข้อมูลในแถวนี้หรือไม่
-                        if (rowData['รหัสทรัพย์สิน'] || rowData['ชื่อทรัพย์สิน']) {
-                            jsonData.push(rowData);
+                        // จัดการราคา - ถ้าไม่มีให้ใส่ 0
+                        let price = 0;
+                        const priceValue = row['ราคาซื้อ'] || row['ราคา'] || row['มูลค่า'];
+                        if (priceValue) {
+                            price = parseFloat(String(priceValue).replace(/[^0-9.-]/g, '')) || 0;
                         }
-                    }
+                        
+                        const asset = {
+                            code: row['รหัสทรัพย์สิน'] || row['รหัส'] || '',
+                            name: row['ชื่อทรัพย์สิน'] || row['ชื่อ'] || '',
+                            category: row['หมวดหมู่'] || row['ประเภท'] || '',
+                            brand: row['ยี่ห้อ'] || row['แบรนด์'] || '',
+                            model: row['รุ่น'] || '',
+                            serial: row['Serial Number'] || row['หมายเลขซีเรียล'] || row['Serial'] || '',
+                            purchaseDate: purchaseDate,
+                            price: price,
+                            location: row['สถานที่เก็บ'] || row['สถานที่'] || '',
+                            department: row['แผนก'] || '',
+                            status: row['สถานะ'] || 'สมบูรณ์',
+                            description: row['คำอธิบาย'] || row['หมายเหตุ'] || '',
+                            createdAt: new Date().toISOString()
+                        };
+                        
+                        console.log(`Row ${index + 1}:`, asset);
+                        return asset;
+                    });
                     
-                    console.log('Imported data:', jsonData);
-                    
-                    importData = jsonData.map(row => ({
-                        code: String(row['รหัสทรัพย์สิน'] || ''),
-                        name: String(row['ชื่อทรัพย์สิน'] || ''),
-                        category: String(row['หมวดหมู่'] || ''),
-                        brand: String(row['ยี่ห้อ'] || ''),
-                        model: String(row['รุ่น'] || ''),
-                        serial: String(row['Serial Number'] || ''),
-                        purchaseDate: row['วันที่ซื้อ'] || '',
-                        price: parseFloat(row['ราคาซื้อ']) || 0,
-                        location: String(row['สถานที่เก็บ'] || ''),
-                        department: String(row['แผนก'] || ''),
-                        status: String(row['สถานะ'] || 'สมบูรณ์'),
-                        description: String(row['คำอธิบาย'] || ''),
-                        createdAt: new Date().toISOString()
-                    }));
-                    
-                    // กรองเฉพาะข้อมูลที่มีรหัสและชื่อ
-                    importData = importData.filter(asset => asset.code && asset.name);
+                    // กรองเฉพาะที่มีข้อมูลสำคัญ
+                    importData = importData.filter(asset => {
+                        return asset.code || asset.name; // ต้องมีอย่างน้อยรหัสหรือชื่อ
+                    });
                     
                     hideLoading();
                     
                     if (importData.length === 0) {
-                        showNotification('⚠️ ไม่พบข้อมูลที่ถูกต้องในไฟล์', 'warning');
+                        showNotification('⚠️ ไม่พบข้อมูลที่ถูกต้อง กรุณาตรวจสอบไฟล์', 'warning');
                         return;
                     }
                     
                     showPreview();
-                    showNotification('✅ อ่านไฟล์สำเร็จ! พบ ' + importData.length + ' รายการ', 'success');
+                    showNotification(`✅ อ่านไฟล์สำเร็จ! พบ ${importData.length} รายการ`, 'success');
                     
                 } catch (error) {
                     hideLoading();
-                    console.error('Error details:', error);
+                    console.error('Import error:', error);
                     showNotification('❌ เกิดข้อผิดพลาด: ' + error.message, 'error');
                 }
             };
@@ -2306,17 +2300,37 @@
             showLoading();
             
             try {
+                // ตรวจสอบและเติมข้อมูลที่ขาด
+                const processedData = importData.map(asset => {
+                    // ถ้าไม่มีราคาให้ใส่ 0
+                    if (!asset.price || asset.price === '') {
+                        asset.price = 0;
+                    }
+                    
+                    // ถ้าไม่มีสถานะให้ใส่ "สมบูรณ์"
+                    if (!asset.status) {
+                        asset.status = 'สมบูรณ์';
+                    }
+                    
+                    // ถ้าไม่มีสถานที่ให้ใส่ "คลังสินค้าหลัก"
+                    if (!asset.location) {
+                        asset.location = 'คลังสินค้าหลัก - โซน A';
+                    }
+                    
+                    return asset;
+                });
+                
                 // Add to local storage
-                assetsData = [...assetsData, ...importData];
+                assetsData = [...assetsData, ...processedData];
                 localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
                 
                 // Save to Google Sheets if configured
                 if (sheetsConfig.webAppUrl) {
-                    await saveToGoogleSheets(importData);
+                    await saveToGoogleSheets(processedData);
                 }
                 
                 hideLoading();
-                showNotification('✅ นำเข้าข้อมูล ' + importData.length + ' รายการสำเร็จ!', 'success');
+                showNotification(`✅ นำเข้าข้อมูล ${processedData.length} รายการสำเร็จ!`, 'success');
                 
                 importData = [];
                 document.getElementById('previewSection').style.display = 'none';
