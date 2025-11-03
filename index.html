@@ -1763,7 +1763,16 @@
         let assetsData = [];
         let importData = [];
         
-        // ⚙️ ตั้งค่า Google Apps Script URL (สำหรับบันทึกข้อมูล)
+        // ========================================
+        // ⚙️ การตั้งค่า Google Apps Script URL
+        // ========================================
+        // 🔥 สำคัญ: ใส่ URL ของ Google Apps Script ที่นี่
+        // เมื่อตั้งค่าที่นี่แล้ว ทุกคนที่เปิดเว็บจะใช้งานได้ทันทีโดยไม่ต้องตั้งค่าใหม่
+        // 
+        // วิธีการ:
+        // 1. Deploy Google Apps Script ของคุณ
+        // 2. Copy Web App URL
+        // 3. แทนที่ URL ด้านล่างนี้
         const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcSH7cQ3kYiSvMkj49uounseXuUAwH6q2iFS85fZFV8FcwoC0X5ojPOJpRNt1PAuge/exec';
         
         // ⚙️ ตั้งค่า Google Sheets API (สำหรับอ่านข้อมูลแบบเร็ว - ถ้ามี)
@@ -2998,10 +3007,10 @@
 
         // Load Data from Google Sheets
         async function loadFromGoogleSheets() {
-            const { webAppUrl } = sheetsConfig;
+            const webAppUrl = sheetsConfig.webAppUrl || GOOGLE_APPS_SCRIPT_URL;
             
             if (!webAppUrl) {
-                showNotification('https://script.google.com/macros/s/AKfycbzcSH7cQ3kYiSvMkj49uounseXuUAwH6q2iFS85fZFV8FcwoC0X5ojPOJpRNt1PAuge/exec', 'error');
+                showNotification('กรุณาตั้งค่า Web App URL ในหน้าตั้งค่าระบบ', 'error');
                 return;
             }
             
@@ -3055,10 +3064,10 @@
 
         // Save to Google Sheets
         async function saveToGoogleSheets(assets) {
-            const { webAppUrl } = sheetsConfig;
+            const webAppUrl = sheetsConfig.webAppUrl || GOOGLE_APPS_SCRIPT_URL;
             
             if (!webAppUrl) {
-                throw new Error('https://script.google.com/macros/s/AKfycbzcSH7cQ3kYiSvMkj49uounseXuUAwH6q2iFS85fZFV8FcwoC0X5ojPOJpRNt1PAuge/exec');
+                throw new Error('กรุณาตั้งค่า Web App URL ในหน้าตั้งค่าระบบ');
             }
             
             const rows = assets.map(asset => [
@@ -3090,10 +3099,10 @@
 
         // Initialize Google Sheets with Headers
         async function initializeGoogleSheets() {
-            const { webAppUrl } = sheetsConfig;
+            const webAppUrl = sheetsConfig.webAppUrl || GOOGLE_APPS_SCRIPT_URL;
             
             if (!webAppUrl) {
-                showNotification('https://script.google.com/macros/s/AKfycbzcSH7cQ3kYiSvMkj49uounseXuUAwH6q2iFS85fZFV8FcwoC0X5ojPOJpRNt1PAuge/exec');
+                showNotification('กรุณาตั้งค่า Web App URL ในหน้าตั้งค่าระบบ', 'warning');
                 return;
             }
             
@@ -3135,10 +3144,16 @@
 
         // Test Connection
         async function testConnection() {
-            const webAppUrl = document.getElementById('webAppUrl').value;
+            let webAppUrl = document.getElementById('webAppUrl').value.trim();
+            
+            // ⭐ ถ้า input ว่าง ให้ใช้ค่า default
+            if (!webAppUrl) {
+                webAppUrl = GOOGLE_APPS_SCRIPT_URL;
+                document.getElementById('webAppUrl').value = webAppUrl;
+            }
             
             if (!webAppUrl) {
-                showNotification('https://script.google.com/macros/s/AKfycbzcSH7cQ3kYiSvMkj49uounseXuUAwH6q2iFS85fZFV8FcwoC0X5ojPOJpRNt1PAuge/exec', 'warning');
+                showNotification('กรุณากรอก Web App URL', 'warning');
                 return;
             }
             
@@ -3218,8 +3233,13 @@
 
         // Save Settings
         function saveSettings() {
-            const webAppUrl = document.getElementById('webAppUrl').value;
+            let webAppUrl = document.getElementById('webAppUrl').value.trim();
             const companyName = document.getElementById('companyName').value;
+            
+            // ⭐ ถ้า input ว่าง ให้ใช้ค่า default
+            if (!webAppUrl) {
+                webAppUrl = GOOGLE_APPS_SCRIPT_URL;
+            }
             
             sheetsConfig = { webAppUrl, sheetName: 'Assets' };
             localStorage.setItem('fmcgSheetsConfig', JSON.stringify(sheetsConfig));
@@ -3305,6 +3325,13 @@
                 sheetsConfig = JSON.parse(savedConfig);
                 document.getElementById('webAppUrl').value = sheetsConfig.webAppUrl;
                 updateSheetsStatus(true);
+            } else {
+                // ⭐ ถ้าไม่มี localStorage ให้ใช้ค่า default
+                document.getElementById('webAppUrl').value = GOOGLE_APPS_SCRIPT_URL;
+                // อัปเดตสถานะว่าเชื่อมต่อแล้ว (เพราะมี URL default)
+                if (GOOGLE_APPS_SCRIPT_URL) {
+                    updateSheetsStatus(true);
+                }
             }
             
             const savedCompany = localStorage.getItem('fmcgCompanyName');
