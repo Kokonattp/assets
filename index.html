@@ -9,6 +9,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -1472,6 +1474,12 @@
         <div id="locations" class="page">
             <div class="header">
                 <h1><i class="fas fa-map-marker-alt"></i> สถานที่เก็บทรัพย์สิน</h1>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="openCapacityModal()">
+                        <i class="fas fa-edit"></i>
+                        ตั้งค่าความจุ
+                    </button>
+                </div>
             </div>
 
             <div class="stats-grid">
@@ -1525,18 +1533,60 @@
                             <th>สถานที่</th>
                             <th>โซน</th>
                             <th>จำนวนทรัพย์สิน</th>
+                            <th>ความจุสูงสุด</th>
                             <th>อัตราการใช้งาน</th>
                             <th>สถานะ</th>
+                            <th>การจัดการ</th>
                         </tr>
                     </thead>
                     <tbody id="locationsTableBody">
                         <tr>
-                            <td colspan="5" style="text-align: center; color: #aaa; padding: 40px;">
+                            <td colspan="7" style="text-align: center; color: #aaa; padding: 40px;">
                                 ยังไม่มีข้อมูลทรัพย์สิน
                             </td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- Capacity Modal -->
+        <div id="capacityModal" class="modal">
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-warehouse"></i> ตั้งค่าความจุสถานที่</h2>
+                    <button class="close-btn" onclick="closeModal('capacityModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="capacityLocationName">
+                    
+                    <div class="form-group">
+                        <label><strong>สถานที่:</strong></label>
+                        <p id="capacityLocationDisplay" style="color: var(--primary); font-weight: 600;"></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label><strong>จำนวนทรัพย์สินปัจจุบัน:</strong></label>
+                        <p id="capacityCurrentCount" style="font-size: 24px; color: var(--primary); font-weight: 600;"></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label>ความจุสูงสุด (Max Capacity) <span class="required">*</span></label>
+                        <input type="number" id="capacityMaxValue" min="1" placeholder="กรอกความจุสูงสุด" required>
+                        <small style="color: #666; display: block; margin-top: 5px;">
+                            <i class="fas fa-info-circle"></i> ควรตั้งให้มากกว่าจำนวนปัจจุบัน
+                        </small>
+                    </div>
+
+                    <div class="form-actions">
+                        <button class="btn btn-secondary" onclick="closeModal('capacityModal')">
+                            <i class="fas fa-times"></i> ยกเลิก
+                        </button>
+                        <button class="btn btn-success" onclick="saveCapacity()">
+                            <i class="fas fa-check"></i> บันทึก
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1621,9 +1671,13 @@
                         <i class="fas fa-sync"></i>
                         รีเฟรช
                     </button>
+                    <button class="btn btn-warning" onclick="exportReportToPDF()">
+                        <i class="fas fa-file-pdf"></i>
+                        Export PDF
+                    </button>
                     <button class="btn btn-success" onclick="exportDetailedReport()">
                         <i class="fas fa-file-excel"></i>
-                        Export รายงาน
+                        Export Excel
                     </button>
                 </div>
             </div>
@@ -1806,6 +1860,39 @@
                         <i class="fas fa-chart-line"></i> แนวโน้มการเพิ่มทรัพย์สินรายเดือน
                     </h2>
                     <canvas id="trendChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+
+            <!-- Department Holdings by Month -->
+            <div style="margin-top: 30px;">
+                <h2 style="margin-bottom: 20px;">
+                    <i class="fas fa-building"></i> การถือครองทรัพย์สินรายเดือนแยกตามแผนก
+                </h2>
+                
+                <div class="charts-grid">
+                    <!-- Value by Department per Month -->
+                    <div class="chart-card">
+                        <h3><i class="fas fa-dollar-sign"></i> มูลค่าถือครองรายเดือน (แยกแผนก)</h3>
+                        <canvas id="departmentValueTrendChart" style="max-height: 350px;"></canvas>
+                        <div style="margin-top: 15px;">
+                            <small style="color: #666;">
+                                <i class="fas fa-info-circle"></i> 
+                                แสดงมูลค่าสะสมของทรัพย์สินในแต่ละแผนกตามช่วงเวลา
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Quantity by Department per Month -->
+                    <div class="chart-card">
+                        <h3><i class="fas fa-boxes"></i> จำนวนถือครองรายเดือน (แยกแผนก)</h3>
+                        <canvas id="departmentCountTrendChart" style="max-height: 350px;"></canvas>
+                        <div style="margin-top: 15px;">
+                            <small style="color: #666;">
+                                <i class="fas fa-info-circle"></i> 
+                                แสดงจำนวนทรัพย์สินสะสมในแต่ละแผนกตามช่วงเวลา
+                            </small>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -3486,13 +3573,19 @@
         }
 
         // Update Locations Page with Real Data
+        // ========================================
+        // 📍 Location & Capacity Management
+        // ========================================
+        
+        let locationCapacity = JSON.parse(localStorage.getItem('fmcgLocationCapacity') || '{}');
+
         function updateLocationsPage() {
             if (assetsData.length === 0) {
                 const tbody = document.getElementById('locationsTableBody');
                 if (tbody) {
                     tbody.innerHTML = `
                         <tr>
-                            <td colspan="5" style="text-align: center; color: #aaa; padding: 40px;">
+                            <td colspan="7" style="text-align: center; color: #aaa; padding: 40px;">
                                 ยังไม่มีข้อมูลทรัพย์สิน
                             </td>
                         </tr>
@@ -3521,38 +3614,128 @@
             // Calculate totals
             const totalLocations = Object.keys(locationData).length;
             const totalAssets = assetsData.length;
-            const totalComplete = assetsData.filter(a => a.status === 'สมบูรณ์').length;
-            const avgCapacity = totalAssets > 0 ? Math.round((totalComplete / totalAssets) * 100) : 0;
-            const fullLocations = Object.values(locationData).filter(loc => {
-                const capacity = Math.round((loc.complete / loc.total) * 100);
-                return capacity >= 90;
-            }).length;
+            
+            // Calculate average capacity usage
+            let totalUsagePercent = 0;
+            let locationsWithCap = 0;
+            let fullLocationsCount = 0;
+            
+            Object.entries(locationData).forEach(([loc, data]) => {
+                const maxCap = locationCapacity[loc] || 0;
+                if (maxCap > 0) {
+                    const usagePercent = (data.total / maxCap) * 100;
+                    totalUsagePercent += usagePercent;
+                    locationsWithCap++;
+                    if (usagePercent >= 90) fullLocationsCount++;
+                }
+            });
+            
+            const avgCapacity = locationsWithCap > 0 
+                ? Math.round(totalUsagePercent / locationsWithCap) 
+                : 0;
 
             // Update stats
             document.getElementById('totalLocations').textContent = totalLocations;
             document.getElementById('avgCapacity').textContent = avgCapacity + '%';
             document.getElementById('totalAssetsInLocations').textContent = totalAssets;
-            document.getElementById('fullLocations').textContent = fullLocations;
+            document.getElementById('fullLocations').textContent = fullLocationsCount;
 
             // Update location table
             const tbody = document.getElementById('locationsTableBody');
             if (tbody) {
                 tbody.innerHTML = Object.entries(locationData).map(([location, data]) => {
-                    const capacity = Math.round((data.complete / data.total) * 100);
-                    const statusClass = capacity >= 90 ? 'maintenance' : capacity >= 75 ? 'in-use' : 'available';
-                    const statusText = capacity >= 90 ? 'เกือบเต็ม' : capacity >= 75 ? 'ใช้งานปกติ' : 'ว่าง';
+                    const maxCap = locationCapacity[location] || 0;
+                    const usagePercent = maxCap > 0 ? (data.total / maxCap) * 100 : 0;
+                    
+                    let statusClass, statusText;
+                    if (maxCap === 0) {
+                        statusClass = 'available';
+                        statusText = 'ไม่กำหนด';
+                    } else if (usagePercent >= 90) {
+                        statusClass = 'broken';
+                        statusText = 'เต็ม (>90%)';
+                    } else if (usagePercent >= 70) {
+                        statusClass = 'maintenance';
+                        statusText = 'เตือน (70-90%)';
+                    } else {
+                        statusClass = 'complete';
+                        statusText = 'ปกติ (<70%)';
+                    }
+                    
+                    const progressBarWidth = maxCap > 0 ? Math.min(usagePercent, 100) : 0;
+                    const progressBarColor = usagePercent >= 90 ? '#ef4444' : usagePercent >= 70 ? '#f59e0b' : '#10b981';
                     
                     return `
                         <tr>
-                            <td>${location}</td>
+                            <td><strong>${location}</strong></td>
                             <td>-</td>
-                            <td>${data.total}</td>
-                            <td>${capacity}%</td>
+                            <td style="text-align: center; font-weight: 600;">${data.total}</td>
+                            <td style="text-align: center;">
+                                ${maxCap > 0 ? maxCap : '<span style="color: #999;">-</span>'}
+                            </td>
+                            <td>
+                                ${maxCap > 0 ? `
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <div style="flex: 1; background: #e5e5e5; border-radius: 10px; height: 20px; overflow: hidden;">
+                                            <div style="background: ${progressBarColor}; width: ${progressBarWidth}%; height: 100%; 
+                                                        display: flex; align-items: center; justify-content: center; 
+                                                        color: white; font-size: 11px; font-weight: 600; transition: all 0.3s;">
+                                                ${usagePercent.toFixed(1)}%
+                                            </div>
+                                        </div>
+                                    </div>
+                                ` : '<span style="color: #999;">-</span>'}
+                            </td>
                             <td><span class="badge ${statusClass}">${statusText}</span></td>
+                            <td style="text-align: center;">
+                                <button class="action-btn primary" onclick="editCapacity('${location}', ${data.total})" title="แก้ไขความจุ">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </td>
                         </tr>
                     `;
                 }).join('');
             }
+        }
+
+        function openCapacityModal() {
+            // Show all locations to set capacity
+            const locations = [...new Set(assetsData.map(a => a.location).filter(Boolean))];
+            
+            if (locations.length === 0) {
+                showNotification('⚠️ ไม่มีสถานที่ให้ตั้งค่า กรุณาเพิ่มทรัพย์สินก่อน', 'warning');
+                return;
+            }
+            
+            // For now, just notify - could open a list selector
+            showNotification('💡 กดปุ่มแก้ไขในแถวของแต่ละสถานที่เพื่อตั้งค่าความจุ', 'success');
+        }
+
+        function editCapacity(locationName, currentCount) {
+            document.getElementById('capacityLocationName').value = locationName;
+            document.getElementById('capacityLocationDisplay').textContent = locationName;
+            document.getElementById('capacityCurrentCount').textContent = currentCount;
+            document.getElementById('capacityMaxValue').value = locationCapacity[locationName] || currentCount + 50;
+            
+            openModal('capacityModal');
+        }
+
+        function saveCapacity() {
+            const locationName = document.getElementById('capacityLocationName').value;
+            const maxValue = parseInt(document.getElementById('capacityMaxValue').value);
+            
+            if (!maxValue || maxValue < 1) {
+                showNotification('⚠️ กรุณากรอกความจุให้ถูกต้อง', 'warning');
+                return;
+            }
+            
+            locationCapacity[locationName] = maxValue;
+            localStorage.setItem('fmcgLocationCapacity', JSON.stringify(locationCapacity));
+            
+            closeModal('capacityModal');
+            updateLocationsPage();
+            
+            showNotification(`✅ ตั้งค่าความจุสถานที่ "${locationName}" = ${maxValue} สำเร็จ!`, 'success');
         }
 
         // Update Maintenance Page with Real Data
@@ -4017,6 +4200,166 @@
                     }
                 }
             });
+            
+            // Update department trend charts
+            updateDepartmentTrendCharts(data);
+        }
+
+        // ========================================
+        // 📊 Department Holdings Trend Charts
+        // ========================================
+        
+        function updateDepartmentTrendCharts(data) {
+            // Get all unique months
+            const allMonths = new Set();
+            data.forEach(asset => {
+                const date = new Date(asset.createdAt || asset.purchaseDate);
+                const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                allMonths.add(monthKey);
+            });
+            
+            const sortedMonths = Array.from(allMonths).sort();
+            
+            // Get all departments
+            const departments = [...new Set(data.map(a => a.department).filter(Boolean))];
+            
+            // Generate colors for departments
+            const colors = [
+                '#14b8a6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444',
+                '#8b5cf6', '#ec4899', '#6366f1', '#84cc16', '#f97316'
+            ];
+            
+            // Calculate cumulative holdings by department per month
+            const departmentMonthlyData = {};
+            
+            departments.forEach(dept => {
+                departmentMonthlyData[dept] = {
+                    count: [],
+                    value: []
+                };
+                
+                let cumulativeCount = 0;
+                let cumulativeValue = 0;
+                
+                sortedMonths.forEach(month => {
+                    // Count assets added up to this month
+                    const assetsInMonth = data.filter(asset => {
+                        const deptMatch = asset.department === dept;
+                        const assetDate = new Date(asset.createdAt || asset.purchaseDate);
+                        const assetMonth = `${assetDate.getFullYear()}-${String(assetDate.getMonth() + 1).padStart(2, '0')}`;
+                        return deptMatch && assetMonth <= month;
+                    });
+                    
+                    cumulativeCount = assetsInMonth.length;
+                    cumulativeValue = assetsInMonth.reduce((sum, a) => sum + (Number(a.price) || 0), 0);
+                    
+                    departmentMonthlyData[dept].count.push(cumulativeCount);
+                    departmentMonthlyData[dept].value.push(cumulativeValue);
+                });
+            });
+            
+            // Create Value Trend Chart
+            const valueCtx = document.getElementById('departmentValueTrendChart');
+            if (valueCtx) {
+                if (reportCharts['departmentValueTrendChart']) {
+                    reportCharts['departmentValueTrendChart'].destroy();
+                }
+                
+                const valueDatasets = departments.map((dept, index) => ({
+                    label: dept,
+                    data: departmentMonthlyData[dept].value,
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: colors[index % colors.length] + '20',
+                    tension: 0.4,
+                    fill: false,
+                    borderWidth: 2
+                }));
+                
+                reportCharts['departmentValueTrendChart'] = new Chart(valueCtx, {
+                    type: 'line',
+                    data: {
+                        labels: sortedMonths.map(m => {
+                            const [year, month] = m.split('-');
+                            return `${month}/${year}`;
+                        }),
+                        datasets: valueDatasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: { 
+                                position: 'bottom',
+                                labels: { boxWidth: 12 }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': ' + formatCurrency(context.parsed.y);
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return formatCurrencyShort(value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Create Count Trend Chart
+            const countCtx = document.getElementById('departmentCountTrendChart');
+            if (countCtx) {
+                if (reportCharts['departmentCountTrendChart']) {
+                    reportCharts['departmentCountTrendChart'].destroy();
+                }
+                
+                const countDatasets = departments.map((dept, index) => ({
+                    label: dept,
+                    data: departmentMonthlyData[dept].count,
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: colors[index % colors.length] + '20',
+                    tension: 0.4,
+                    fill: false,
+                    borderWidth: 2
+                }));
+                
+                reportCharts['departmentCountTrendChart'] = new Chart(countCtx, {
+                    type: 'line',
+                    data: {
+                        labels: sortedMonths.map(m => {
+                            const [year, month] = m.split('-');
+                            return `${month}/${year}`;
+                        }),
+                        datasets: countDatasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: { 
+                                position: 'bottom',
+                                labels: { boxWidth: 12 }
+                            }
+                        },
+                        scales: {
+                            y: { 
+                                beginAtZero: true,
+                                ticks: {
+                                    precision: 0
+                                }
+                            }
+                        }
+                    }
+                });
+            }
         }
 
         function updateTopAssetsTable(data) {
@@ -4253,7 +4596,253 @@
             
             XLSX.writeFile(wb, `Detailed_Asset_Report${dateStr}_${new Date().toISOString().split('T')[0]}.xlsx`);
             
-            showNotification('✅ Export รายงานสำเร็จ!', 'success');
+            showNotification('✅ Export Excel สำเร็จ!', 'success');
+        }
+
+        // ========================================
+        // 📄 Export Report to PDF
+        // ========================================
+        
+        async function exportReportToPDF() {
+            if (assetsData.length === 0) {
+                showNotification('ไม่มีข้อมูลให้ Export', 'warning');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('p', 'mm', 'a4');
+                
+                const data = getFilteredReportData();
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const pageHeight = doc.internal.pageSize.getHeight();
+                let yPos = 20;
+                
+                // ========================================
+                // 📋 หน้าที่ 1: ปกและสรุปรายงาน
+                // ========================================
+                
+                // Logo & Title
+                doc.setFontSize(24);
+                doc.setTextColor(20, 184, 166);
+                doc.text('FMCG Asset Management', pageWidth / 2, yPos, { align: 'center' });
+                
+                yPos += 10;
+                doc.setFontSize(16);
+                doc.setTextColor(0, 0, 0);
+                doc.text('รายงานและสถิติทรัพย์สินแบบละเอียด', pageWidth / 2, yPos, { align: 'center' });
+                
+                // Date Range
+                yPos += 15;
+                doc.setFontSize(12);
+                doc.setTextColor(100, 100, 100);
+                const dateRangeText = reportDateRange.start && reportDateRange.end
+                    ? `ช่วงเวลา: ${formatThaiDate(reportDateRange.start)} - ${formatThaiDate(reportDateRange.end)}`
+                    : 'ช่วงเวลา: ทั้งหมด';
+                doc.text(dateRangeText, pageWidth / 2, yPos, { align: 'center' });
+                
+                yPos += 5;
+                doc.setFontSize(10);
+                doc.text(`สร้างเมื่อ: ${new Date().toLocaleString('th-TH')}`, pageWidth / 2, yPos, { align: 'center' });
+                
+                // Summary Statistics
+                yPos += 15;
+                doc.setFontSize(14);
+                doc.setTextColor(20, 184, 166);
+                doc.text('📊 สรุปข้อมูลรวม', 15, yPos);
+                
+                yPos += 10;
+                doc.setFontSize(11);
+                doc.setTextColor(0, 0, 0);
+                
+                const totalAssets = data.length;
+                const totalValue = data.reduce((sum, a) => sum + (Number(a.price) || 0), 0);
+                const avgValue = totalAssets > 0 ? totalValue / totalAssets : 0;
+                const depreciation = totalValue * 0.15;
+                const netValue = totalValue - depreciation;
+                
+                const statusCount = {};
+                data.forEach(a => {
+                    statusCount[a.status] = (statusCount[a.status] || 0) + 1;
+                });
+                
+                const categories = [...new Set(data.map(a => a.category))].length;
+                const locations = [...new Set(data.map(a => a.location))].length;
+                const departments = [...new Set(data.map(a => a.department).filter(Boolean))].length;
+                
+                const summaryData = [
+                    `จำนวนทรัพย์สินทั้งหมด: ${totalAssets.toLocaleString()} รายการ`,
+                    `มูลค่ารวม: ${formatCurrency(totalValue)}`,
+                    `มูลค่าเฉลี่ย: ${formatCurrency(avgValue)} / ชิ้น`,
+                    `ค่าเสื่อมราคา (15%): ${formatCurrency(depreciation)}`,
+                    `มูลค่าสุทธิ: ${formatCurrency(netValue)}`,
+                    '',
+                    `จำนวนหมวดหมู่: ${categories} หมวด`,
+                    `จำนวนสถานที่: ${locations} แห่ง`,
+                    `จำนวนแผนก: ${departments} แผนก`,
+                    '',
+                    `สมบูรณ์: ${statusCount['สมบูรณ์'] || 0} (${((statusCount['สมบูรณ์'] || 0) / totalAssets * 100).toFixed(1)}%)`,
+                    `ส่งซ่อม: ${statusCount['ส่งซ่อม'] || 0} (${((statusCount['ส่งซ่อม'] || 0) / totalAssets * 100).toFixed(1)}%)`,
+                    `ชำรุด: ${statusCount['ชำรุด'] || 0} (${((statusCount['ชำรุด'] || 0) / totalAssets * 100).toFixed(1)}%)`,
+                    `เสีย: ${statusCount['เสีย'] || 0} (${((statusCount['เสีย'] || 0) / totalAssets * 100).toFixed(1)}%)`
+                ];
+                
+                summaryData.forEach(line => {
+                    doc.text(line, 20, yPos);
+                    yPos += 6;
+                });
+                
+                // ========================================
+                // 📊 หน้าที่ 2-3: กราฟ
+                // ========================================
+                
+                doc.addPage();
+                yPos = 20;
+                
+                doc.setFontSize(14);
+                doc.setTextColor(20, 184, 166);
+                doc.text('📈 กราฟและแผนภูมิ', 15, yPos);
+                
+                yPos += 10;
+                
+                // Capture charts
+                const charts = [
+                    { id: 'valueByCategory', title: 'มูลค่าแยกตามหมวดหมู่' },
+                    { id: 'countByCategory', title: 'จำนวนแยกตามหมวดหมู่' },
+                    { id: 'statusPieChart', title: 'สัดส่วนสถานะ' },
+                    { id: 'trendChart', title: 'แนวโน้มรายเดือน' }
+                ];
+                
+                for (let i = 0; i < charts.length; i++) {
+                    const chart = charts[i];
+                    const canvas = document.getElementById(chart.id);
+                    
+                    if (canvas) {
+                        try {
+                            const imgData = canvas.toDataURL('image/png');
+                            const imgWidth = pageWidth - 30;
+                            const imgHeight = 60;
+                            
+                            if (yPos + imgHeight + 15 > pageHeight - 20) {
+                                doc.addPage();
+                                yPos = 20;
+                            }
+                            
+                            doc.setFontSize(11);
+                            doc.setTextColor(0, 0, 0);
+                            doc.text(chart.title, 15, yPos);
+                            yPos += 5;
+                            
+                            doc.addImage(imgData, 'PNG', 15, yPos, imgWidth, imgHeight);
+                            yPos += imgHeight + 10;
+                        } catch (error) {
+                            console.error(`Error capturing chart ${chart.id}:`, error);
+                        }
+                    }
+                }
+                
+                // ========================================
+                // 🏆 หน้าที่ 4: Top 10 Assets
+                // ========================================
+                
+                doc.addPage();
+                yPos = 20;
+                
+                doc.setFontSize(14);
+                doc.setTextColor(20, 184, 166);
+                doc.text('🏆 Top 10 ทรัพย์สินมูลค่าสูงสุด', 15, yPos);
+                
+                yPos += 10;
+                
+                const sorted = [...data].sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
+                const top10 = sorted.slice(0, 10);
+                
+                doc.setFontSize(9);
+                doc.setTextColor(0, 0, 0);
+                
+                // Table header
+                const colWidths = [15, 30, 50, 35, 30];
+                let xPos = 15;
+                
+                doc.setFillColor(20, 184, 166);
+                doc.setTextColor(255, 255, 255);
+                doc.rect(15, yPos, pageWidth - 30, 7, 'F');
+                
+                doc.text('อันดับ', xPos + 2, yPos + 5);
+                xPos += colWidths[0];
+                doc.text('รหัส', xPos + 2, yPos + 5);
+                xPos += colWidths[1];
+                doc.text('ชื่อทรัพย์สิน', xPos + 2, yPos + 5);
+                xPos += colWidths[2];
+                doc.text('หมวดหมู่', xPos + 2, yPos + 5);
+                xPos += colWidths[3];
+                doc.text('มูลค่า', xPos + 2, yPos + 5);
+                
+                yPos += 7;
+                
+                // Table rows
+                doc.setTextColor(0, 0, 0);
+                top10.forEach((asset, index) => {
+                    if (yPos > pageHeight - 20) {
+                        doc.addPage();
+                        yPos = 20;
+                    }
+                    
+                    xPos = 15;
+                    
+                    // Alternating row colors
+                    if (index % 2 === 0) {
+                        doc.setFillColor(240, 249, 249);
+                        doc.rect(15, yPos, pageWidth - 30, 7, 'F');
+                    }
+                    
+                    doc.text(`${index + 1}`, xPos + 2, yPos + 5);
+                    xPos += colWidths[0];
+                    doc.text(asset.code.substring(0, 12), xPos + 2, yPos + 5);
+                    xPos += colWidths[1];
+                    doc.text(asset.name.substring(0, 25), xPos + 2, yPos + 5);
+                    xPos += colWidths[2];
+                    doc.text(asset.category.substring(0, 15), xPos + 2, yPos + 5);
+                    xPos += colWidths[3];
+                    doc.text(formatCurrency(asset.price), xPos + 2, yPos + 5);
+                    
+                    yPos += 7;
+                });
+                
+                // ========================================
+                // 📋 Footer
+                // ========================================
+                
+                const totalPages = doc.internal.getNumberOfPages();
+                for (let i = 1; i <= totalPages; i++) {
+                    doc.setPage(i);
+                    doc.setFontSize(8);
+                    doc.setTextColor(150, 150, 150);
+                    doc.text(
+                        `FMCG Asset Management System - หน้า ${i}/${totalPages}`,
+                        pageWidth / 2,
+                        pageHeight - 10,
+                        { align: 'center' }
+                    );
+                }
+                
+                // Save PDF
+                const dateStr = reportDateRange.start && reportDateRange.end
+                    ? `_${reportDateRange.start}_to_${reportDateRange.end}`
+                    : '';
+                
+                doc.save(`Asset_Report${dateStr}_${new Date().toISOString().split('T')[0]}.pdf`);
+                
+                hideLoading();
+                showNotification('✅ Export PDF สำเร็จ!', 'success');
+                
+            } catch (error) {
+                hideLoading();
+                console.error('PDF Export Error:', error);
+                showNotification('❌ เกิดข้อผิดพลาดในการ Export PDF: ' + error.message, 'error');
+            }
         }
 
         // Utility Functions
