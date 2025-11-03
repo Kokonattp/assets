@@ -1481,9 +1481,13 @@
             <div class="header">
                 <h1><i class="fas fa-map-marker-alt"></i> สถานที่เก็บทรัพย์สิน</h1>
                 <div class="header-actions">
-                    <button class="btn btn-primary" onclick="openCapacityModal()">
-                        <i class="fas fa-edit"></i>
-                        ตั้งค่าความจุ
+                    <button class="btn btn-success" onclick="openAddLocationModal()">
+                        <i class="fas fa-plus"></i>
+                        เพิ่มสถานที่
+                    </button>
+                    <button class="btn btn-primary" onclick="openManageLocationsModal()">
+                        <i class="fas fa-cog"></i>
+                        จัดการสถานที่
                     </button>
                 </div>
             </div>
@@ -1591,6 +1595,82 @@
                         <button class="btn btn-success" onclick="saveCapacity()">
                             <i class="fas fa-check"></i> บันทึก
                         </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Location Modal -->
+        <div id="addLocationModal" class="modal">
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-plus-circle"></i> เพิ่มสถานที่เก็บใหม่</h2>
+                    <button class="close-btn" onclick="closeModal('addLocationModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>ชื่อสถานที่ <span class="required">*</span></label>
+                        <input type="text" id="newLocationName" placeholder="เช่น คลังเก็บสินค้า โซน D" required>
+                        <small style="color: #666; display: block; margin-top: 5px;">
+                            <i class="fas fa-info-circle"></i> ตั้งชื่อที่ไม่ซ้ำกับสถานที่เดิม
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>ความจุสูงสุด (ไม่บังคับ)</label>
+                        <input type="number" id="newLocationCapacity" min="1" placeholder="กรอกความจุ (ถ้ามี)">
+                        <small style="color: #666; display: block; margin-top: 5px;">
+                            <i class="fas fa-info-circle"></i> สามารถตั้งค่าทีหลังได้
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>รายละเอียด</label>
+                        <textarea id="newLocationDescription" placeholder="รายละเอียดเพิ่มเติม..." rows="3"></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button class="btn btn-secondary" onclick="closeModal('addLocationModal')">
+                            <i class="fas fa-times"></i> ยกเลิก
+                        </button>
+                        <button class="btn btn-success" onclick="saveNewLocation()">
+                            <i class="fas fa-check"></i> เพิ่มสถานที่
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Manage Locations Modal -->
+        <div id="manageLocationsModal" class="modal">
+            <div class="modal-content" style="max-width: 800px;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-cog"></i> จัดการสถานที่เก็บ</h2>
+                    <button class="close-btn" onclick="closeModal('manageLocationsModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="color: #666; margin-bottom: 20px;">
+                        <i class="fas fa-info-circle"></i> คุณสามารถแก้ไขหรือลบสถานที่เก็บที่ไม่มีทรัพย์สินอยู่
+                    </p>
+
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>สถานที่</th>
+                                    <th style="text-align: center;">จำนวนทรัพย์สิน</th>
+                                    <th style="text-align: center;">ความจุ</th>
+                                    <th style="text-align: center;">การจัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="manageLocationsTableBody">
+                                <tr>
+                                    <td colspan="4" style="text-align: center; color: #aaa; padding: 20px;">
+                                        กำลังโหลด...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -3913,6 +3993,170 @@
             showNotification(`✅ ตั้งค่าความจุสถานที่ "${locationName}" = ${maxValue} สำเร็จ!`, 'success');
         }
 
+        // ==================== Location Management Functions ====================
+        let customLocations = [];
+
+        // Load custom locations
+        function loadCustomLocations() {
+            const saved = localStorage.getItem('fmcgCustomLocations');
+            if (saved) {
+                customLocations = JSON.parse(saved);
+            }
+        }
+
+        // Get all locations (default + custom)
+        function getAllLocations() {
+            const defaultLocations = [
+                'คลังเก็บสินค้า',
+                'คลังสินค้าหลัก - โซน A',
+                'คลังสินค้าหลัก - โซน B',
+                'คลังสินค้าหลัก - โซน C',
+                'คลังสินค้ารอง',
+                'ศูนย์กระจายสินค้า'
+            ];
+            return [...defaultLocations, ...customLocations.map(l => l.name)];
+        }
+
+        // Update location dropdowns
+        function updateLocationDropdowns() {
+            const locations = getAllLocations();
+            
+            // Update in add asset form
+            const newLocationSelect = document.getElementById('newLocation');
+            if (newLocationSelect) {
+                const currentValue = newLocationSelect.value;
+                newLocationSelect.innerHTML = '<option value="">เลือกสถานที่</option>' +
+                    locations.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+                if (currentValue) newLocationSelect.value = currentValue;
+            }
+
+            // Update in stock count filter
+            const stockLocationFilter = document.getElementById('stockLocationFilter');
+            if (stockLocationFilter) {
+                const currentValue = stockLocationFilter.value;
+                stockLocationFilter.innerHTML = '<option value="">ทุกสถานที่</option>' +
+                    locations.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+                if (currentValue) stockLocationFilter.value = currentValue;
+            }
+        }
+
+        // Open Add Location Modal
+        function openAddLocationModal() {
+            document.getElementById('newLocationName').value = '';
+            document.getElementById('newLocationCapacity').value = '';
+            document.getElementById('newLocationDescription').value = '';
+            openModal('addLocationModal');
+        }
+
+        // Save New Location
+        function saveNewLocation() {
+            const name = document.getElementById('newLocationName').value.trim();
+            const capacity = document.getElementById('newLocationCapacity').value;
+            const description = document.getElementById('newLocationDescription').value.trim();
+
+            if (!name) {
+                showNotification('⚠️ กรุณากรอกชื่อสถานที่', 'warning');
+                return;
+            }
+
+            // ตรวจสอบว่าชื่อซ้ำหรือไม่
+            const allLocations = getAllLocations();
+            if (allLocations.includes(name)) {
+                showNotification('⚠️ ชื่อสถานที่นี้มีอยู่แล้ว กรุณาใช้ชื่ออื่น', 'warning');
+                return;
+            }
+
+            // เพิ่มสถานที่ใหม่
+            const newLocation = {
+                id: 'LOC-' + new Date().getTime(),
+                name: name,
+                description: description,
+                createdAt: new Date().toISOString()
+            };
+
+            customLocations.push(newLocation);
+            localStorage.setItem('fmcgCustomLocations', JSON.stringify(customLocations));
+
+            // ถ้ามีความจุ ให้บันทึกด้วย
+            if (capacity && parseInt(capacity) > 0) {
+                locationCapacity[name] = parseInt(capacity);
+                localStorage.setItem('fmcgLocationCapacity', JSON.stringify(locationCapacity));
+            }
+
+            closeModal('addLocationModal');
+            updateLocationDropdowns();
+            updateLocationsPage();
+            showNotification(`✅ เพิ่มสถานที่ "${name}" สำเร็จ!`, 'success');
+        }
+
+        // Open Manage Locations Modal
+        function openManageLocationsModal() {
+            loadManageLocationsTable();
+            openModal('manageLocationsModal');
+        }
+
+        // Load Manage Locations Table
+        function loadManageLocationsTable() {
+            const tbody = document.getElementById('manageLocationsTableBody');
+            const allLocations = getAllLocations();
+
+            // นับจำนวนทรัพย์สินในแต่ละสถานที่
+            const locationCounts = {};
+            assetsData.forEach(asset => {
+                const loc = asset.location || 'ไม่ระบุ';
+                locationCounts[loc] = (locationCounts[loc] || 0) + 1;
+            });
+
+            tbody.innerHTML = allLocations.map(location => {
+                const count = locationCounts[location] || 0;
+                const capacity = locationCapacity[location] || '-';
+                const isCustom = customLocations.some(l => l.name === location);
+                const canDelete = isCustom && count === 0;
+
+                return `
+                    <tr>
+                        <td>
+                            <strong>${location}</strong>
+                            ${isCustom ? '<span class="badge complete" style="margin-left: 10px; font-size: 10px;">กำหนดเอง</span>' : ''}
+                        </td>
+                        <td style="text-align: center; font-weight: 600;">${count}</td>
+                        <td style="text-align: center;">${capacity !== '-' ? capacity : '<span style="color: #999;">ไม่ระบุ</span>'}</td>
+                        <td style="text-align: center;">
+                            <button class="action-btn primary" onclick="editCapacity('${location}', ${count})" title="ตั้งค่าความจุ">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            ${canDelete ? `
+                                <button class="action-btn danger" onclick="deleteLocation('${location}')" title="ลบสถานที่">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            ` : ''}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Delete Location
+        function deleteLocation(locationName) {
+            const confirmed = confirm(`คุณต้องการลบสถานที่ "${locationName}" ใช่หรือไม่?`);
+            if (!confirmed) return;
+
+            // ลบจาก customLocations
+            customLocations = customLocations.filter(l => l.name !== locationName);
+            localStorage.setItem('fmcgCustomLocations', JSON.stringify(customLocations));
+
+            // ลบ capacity ถ้ามี
+            if (locationCapacity[locationName]) {
+                delete locationCapacity[locationName];
+                localStorage.setItem('fmcgLocationCapacity', JSON.stringify(locationCapacity));
+            }
+
+            loadManageLocationsTable();
+            updateLocationDropdowns();
+            updateLocationsPage();
+            showNotification(`✅ ลบสถานที่ "${locationName}" สำเร็จ!`, 'success');
+        }
+
         // Update Maintenance Page with Real Data
         function updateMaintenancePage() {
             if (assetsData.length === 0) {
@@ -5973,6 +6217,10 @@
             if (savedCompany) {
                 document.getElementById('companyName').value = savedCompany;
             }
+            
+            // Load custom locations
+            loadCustomLocations();
+            updateLocationDropdowns();
             
             initDashboardCharts();
             updateDashboard();
