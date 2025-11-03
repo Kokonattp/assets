@@ -13,15 +13,21 @@ function editAsset(code) {
         return;
     }
     
-    // เติมข้อมูลลงในฟอร์ม
+    // เติมข้อมูลลงในฟอร์ม (ใช้ ID ที่ตรงกับ HTML)
     document.getElementById('editAssetCode').value = asset.code;
-    document.getElementById('editAssetName').value = asset.name;
-    document.getElementById('editAssetCategory').value = asset.category;
-    document.getElementById('editAssetDepartment').value = asset.department || '';
-    document.getElementById('editAssetLocation').value = asset.location;
-    document.getElementById('editAssetQuantity').value = asset.quantity || 1;
-    document.getElementById('editAssetValue').value = asset.value || 0;
-    document.getElementById('editAssetStatus').value = asset.status;
+    document.getElementById('editCode').value = asset.code;
+    document.getElementById('editName').value = asset.name || '';
+    document.getElementById('editCategory').value = asset.category || '';
+    document.getElementById('editBrand').value = asset.brand || '';
+    document.getElementById('editModel').value = asset.model || '';
+    document.getElementById('editSerial').value = asset.serial || '';
+    document.getElementById('editPurchaseDate').value = asset.purchaseDate || '';
+    document.getElementById('editPrice').value = asset.price || 0;
+    document.getElementById('editQuantity').value = asset.quantity || 1;
+    document.getElementById('editLocation').value = asset.location || '';
+    document.getElementById('editDepartment').value = asset.department || '';
+    document.getElementById('editStatus').value = asset.status || 'สมบูรณ์';
+    document.getElementById('editDescription').value = asset.description || '';
     
     // แสดง Modal
     document.getElementById('editAssetModal').classList.add('active');
@@ -32,17 +38,22 @@ function editAsset(code) {
  */
 function saveEditAsset() {
     const code = document.getElementById('editAssetCode').value;
-    const name = document.getElementById('editAssetName').value;
-    const category = document.getElementById('editAssetCategory').value;
-    const department = document.getElementById('editAssetDepartment').value;
-    const location = document.getElementById('editAssetLocation').value;
-    const quantity = parseInt(document.getElementById('editAssetQuantity').value) || 1;
-    const value = parseFloat(document.getElementById('editAssetValue').value) || 0;
-    const status = document.getElementById('editAssetStatus').value;
+    const name = document.getElementById('editName').value;
+    const category = document.getElementById('editCategory').value;
+    const brand = document.getElementById('editBrand').value;
+    const model = document.getElementById('editModel').value;
+    const serial = document.getElementById('editSerial').value;
+    const purchaseDate = document.getElementById('editPurchaseDate').value;
+    const price = parseFloat(document.getElementById('editPrice').value) || 0;
+    const quantity = parseInt(document.getElementById('editQuantity').value) || 1;
+    const location = document.getElementById('editLocation').value;
+    const department = document.getElementById('editDepartment').value;
+    const status = document.getElementById('editStatus').value;
+    const description = document.getElementById('editDescription').value;
     
     // Validate
     if (!name || !category || !location) {
-        showNotification('⚠️ กรุณากรอกข้อมูลให้ครบถ้วน', 'warning');
+        showNotification('⚠️ กรุณากรอกข้อมูลให้ครบถ้วน (ชื่อ, หมวดหมู่, สถานที่)', 'warning');
         return;
     }
     
@@ -58,11 +69,16 @@ function saveEditAsset() {
         ...assetsData[assetIndex],
         name,
         category,
-        department,
-        location,
+        brand,
+        model,
+        serial,
+        purchaseDate,
+        price,
         quantity,
-        value,
+        location,
+        department,
         status,
+        description,
         lastUpdated: new Date().toISOString()
     };
     
@@ -70,7 +86,7 @@ function saveEditAsset() {
     localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
     
     // ถ้ามีการเชื่อมต่อ Google Sheets ให้ซิงค์
-    if (sheetsConfig.webAppUrl) {
+    if (typeof sheetsConfig !== 'undefined' && sheetsConfig.webAppUrl) {
         syncToSheets();
     }
     
