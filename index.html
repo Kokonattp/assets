@@ -875,10 +875,6 @@
             <div class="header">
                 <h1><i class="fas fa-home"></i> แดชบอร์ด FMCG</h1>
                 <div class="header-actions">
-                    <button class="btn btn-info" onclick="loadFromGoogleSheets()">
-                        <i class="fas fa-sync"></i>
-                        โหลดจาก Sheets
-                    </button>
                     <button class="btn btn-info" onclick="showPage('import')">
                         <i class="fas fa-file-excel"></i>
                         Import Excel
@@ -1717,8 +1713,18 @@
         // Global Variables
         let assetsData = [];
         let importData = [];
+        
+        // ⚙️ ตั้งค่า Google Apps Script URL (สำหรับบันทึกข้อมูล)
+        const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcSH7cQ3kYiSvMkj49uounseXuUAwH6q2iFS85fZFV8FcwoC0X5ojPOJpRNt1PAuge/exec';
+        
+        // ⚙️ ตั้งค่า Google Sheets API (สำหรับอ่านข้อมูลแบบเร็ว - ถ้ามี)
+        const USE_SHEETS_API = true; // เปลี่ยนเป็น true ถ้าต้องการใช้ Sheets API
+        const SHEETS_API_KEY = 'AIzaSyCbId0_NCsmI84pl3vRJdqokZRHoMWHmCM';
+        const SPREADSHEET_ID = '1o_Wpre0DNfh5XNIEiWR-8uI3zCDaYxCysI5utuDDkBI';
+        const SHEET_NAME = 'Assets';
+        
         let sheetsConfig = {
-            webAppUrl: '',
+            webAppUrl: GOOGLE_APPS_SCRIPT_URL,
             sheetName: 'Assets'
         };
 
@@ -2107,13 +2113,15 @@
             showLoading();
             
             try {
-                // Save to local storage
-                assetsData.push(asset);
-                localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
-                
-                // Save to Google Sheets if configured
+                // Save to Google Sheets
                 if (sheetsConfig.webAppUrl) {
                     await saveToGoogleSheets([asset]);
+                    
+                    // Reload data from Google Sheets to keep in sync
+                    await loadDataFromSheets();
+                } else {
+                    // Fallback: save to local if Google Sheets not configured
+                    assetsData.push(asset);
                 }
                 
                 hideLoading();
@@ -2128,6 +2136,7 @@
                 document.getElementById('newDescription').value = '';
                 
                 updateDashboard();
+                renderAssetsTable();
                 showPage('assets');
             } catch (error) {
                 hideLoading();
@@ -2136,17 +2145,34 @@
         }
 
         // Delete Asset
-        function deleteAsset(code) {
+        async function deleteAsset(code) {
             if (!confirm('ต้องการลบทรัพย์สิน ' + code + ' หรือไม่?')) {
                 return;
             }
             
-            assetsData = assetsData.filter(a => a.code !== code);
-            localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
+            showLoading();
             
-            showNotification('✅ ลบทรัพย์สินสำเร็จ!', 'success');
-            renderAssetsTable();
-            updateDashboard();
+            try {
+                // Delete from Google Sheets
+                if (sheetsConfig.webAppUrl) {
+                    await deleteFromGoogleSheets(code);
+                    
+                    // Reload data from Google Sheets
+                    await loadDataFromSheets();
+                } else {
+                    // Fallback: delete from local
+                    assetsData = assetsData.filter(a => a.code !== code);
+                }
+                
+                hideLoading();
+                showNotification('✅ ลบทรัพย์สินสำเร็จ!', 'success');
+                renderAssetsTable();
+                updateDashboard();
+                
+            } catch (error) {
+                hideLoading();
+                showNotification('❌ เกิดข้อผิดพลาด: ' + error.message, 'error');
+            }
         }
 
         // Download Template
@@ -2321,13 +2347,15 @@
                     return asset;
                 });
                 
-                // Add to local storage
-                assetsData = [...assetsData, ...processedData];
-                localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
-                
-                // Save to Google Sheets if configured
+                // Save to Google Sheets
                 if (sheetsConfig.webAppUrl) {
                     await saveToGoogleSheets(processedData);
+                    
+                    // Reload data from Google Sheets to keep in sync
+                    await loadDataFromSheets();
+                } else {
+                    // Fallback: save to local if Google Sheets not configured
+                    assetsData = [...assetsData, ...processedData];
                 }
                 
                 hideLoading();
@@ -2338,6 +2366,7 @@
                 document.getElementById('excelFile').value = '';
                 
                 updateDashboard();
+                renderAssetsTable();
                 showPage('assets');
             } catch (error) {
                 hideLoading();
@@ -3033,6 +3062,227 @@
             return result;
         }
 
+        // Delete from Google Sheets
+        async function deleteFromGoogleSheets(assetCode) {
+            const { webAppUrl } = sheetsConfig;
+            
+            if (!webAppUrl) {
+                throw new Error('ไม่พบ Google Apps Script URL');
+            }
+            
+            const response = await fetch(webAppUrl, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'delete',
+                    code: assetCode
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error('ไม่สามารถลบข้อมูลได้');
+            }
+            
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || 'เกิดข้อผิดพลาดในการลบ');
+            }
+            
+            return result;
+        }
+
+        // Update Google Sheets (Replace all data)
+        async function updateAllGoogleSheets() {
+            const { webAppUrl } = sheetsConfig;
+            
+            if (!webAppUrl) {
+                throw new Error('ไม่พบ Google Apps Script URL');
+            }
+            
+            const rows = assetsData.map(asset => [
+                asset.code, asset.name, asset.category, asset.brand, asset.model,
+                asset.serial, asset.purchaseDate, asset.price, asset.location,
+                asset.department || '', asset.status, asset.description, asset.createdAt
+            ]);
+            
+            const response = await fetch(webAppUrl, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'updateAll',
+                    rows: rows
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error('ไม่สามารถอัปเดตข้อมูลได้');
+            }
+            
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || 'เกิดข้อผิดพลาดในการอัปเดต');
+            }
+            
+            return result;
+        }
+
+        // Load Data from Sheets (Auto-load on startup)
+        async function loadDataFromSheets() {
+            try {
+                console.log('🔄 กำลังโหลดข้อมูลจาก Google Sheets...');
+                
+                let result;
+                
+                // เลือกวิธีโหลดข้อมูล
+                if (USE_SHEETS_API) {
+                    // วิธีที่ 1: ใช้ Google Sheets API (เร็วกว่า)
+                    result = await loadFromSheetsAPI();
+                } else {
+                    // วิธีที่ 2: ใช้ Apps Script (วิธีเดิม)
+                    result = await loadFromAppsScript();
+                }
+                
+                if (!result || !result.data || result.data.length <= 1) {
+                    console.warn('⚠️ ไม่พบข้อมูลใน Google Sheets หรือยังไม่มีข้อมูล');
+                    return;
+                }
+                
+                const loadedAssets = result.data.slice(1).map(row => ({
+                    code: row[0] || '',
+                    name: row[1] || '',
+                    category: row[2] || '',
+                    brand: row[3] || '',
+                    model: row[4] || '',
+                    serial: row[5] || '',
+                    purchaseDate: row[6] || '',
+                    price: parseFloat(row[7]) || 0,
+                    location: row[8] || '',
+                    department: row[9] || '',
+                    status: row[10] || 'สมบูรณ์',
+                    description: row[11] || '',
+                    createdAt: row[12] || new Date().toISOString()
+                })).filter(asset => asset.code && asset.name);
+                
+                assetsData = loadedAssets;
+                
+                console.log(`✅ โหลดข้อมูล ${loadedAssets.length} รายการสำเร็จ!`);
+                
+                // Update all pages with loaded data
+                updateDashboard();
+                if (assetsData.length > 0) {
+                    updateDepartmentPage();
+                    updateLocationsPage();
+                    updateMaintenancePage();
+                    updateReportsPage();
+                    renderAssetsTable();
+                }
+                
+            } catch (error) {
+                console.error('❌ เกิดข้อผิดพลาดในการโหลดข้อมูล:', error.message);
+            }
+        }
+
+        // Load from Apps Script (วิธีเดิม)
+        async function loadFromAppsScript() {
+            const { webAppUrl } = sheetsConfig;
+            
+            if (!webAppUrl) {
+                throw new Error('ไม่พบ Google Apps Script URL');
+            }
+            
+            const response = await fetch(webAppUrl);
+            
+            if (!response.ok) {
+                throw new Error('ไม่สามารถเชื่อมต่อ Google Sheets');
+            }
+            
+            return await response.json();
+        }
+
+        // Load from Google Sheets API (เร็วกว่า)
+        async function loadFromSheetsAPI() {
+            if (!SHEETS_API_KEY || !SPREADSHEET_ID) {
+                throw new Error('กรุณาตั้งค่า API Key และ Spreadsheet ID');
+            }
+            
+            const range = `${SHEET_NAME}!A:M`; // A-M คือคอลัมน์ทั้งหมด
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}?key=${SHEETS_API_KEY}`;
+            
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error('ไม่สามารถเชื่อมต่อ Google Sheets API');
+            }
+            
+            const result = await response.json();
+            
+            return {
+                success: true,
+                data: result.values || []
+            };
+        }
+        }
+
+        // Load from Google Sheets (Manual with UI notification)
+        async function loadFromSheets() {
+            const { webAppUrl } = sheetsConfig;
+            
+            if (!webAppUrl) {
+                showNotification('กรุณาตั้งค่า Google Apps Script URL ก่อน', 'error');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const response = await fetch(webAppUrl);
+                
+                if (!response.ok) {
+                    throw new Error('ไม่สามารถดึงข้อมูลได้');
+                }
+                
+                const result = await response.json();
+                
+                if (!result.success || !result.data || result.data.length <= 1) {
+                    hideLoading();
+                    showNotification('⚠️ ไม่พบข้อมูลใน Google Sheets', 'warning');
+                    return;
+                }
+                
+                const loadedAssets = result.data.slice(1).map(row => ({
+                    code: row[0] || '',
+                    name: row[1] || '',
+                    category: row[2] || '',
+                    brand: row[3] || '',
+                    model: row[4] || '',
+                    serial: row[5] || '',
+                    purchaseDate: row[6] || '',
+                    price: parseFloat(row[7]) || 0,
+                    location: row[8] || '',
+                    department: row[9] || '',
+                    status: row[10] || 'สมบูรณ์',
+                    description: row[11] || '',
+                    createdAt: row[12] || new Date().toISOString()
+                })).filter(asset => asset.code && asset.name);
+                
+                assetsData = loadedAssets;
+                
+                hideLoading();
+                showNotification(`✅ โหลดข้อมูล ${loadedAssets.length} รายการสำเร็จ!`, 'success');
+                
+                updateDashboard();
+                updateDepartmentPage();
+                updateLocationsPage();
+                updateMaintenancePage();
+                updateReportsPage();
+                renderAssetsTable();
+                
+            } catch (error) {
+                hideLoading();
+                showNotification('❌ เกิดข้อผิดพลาด: ' + error.message, 'error');
+            }
+        }
+
         // Initialize Google Sheets with Headers
         async function initializeGoogleSheets() {
             const { webAppUrl } = sheetsConfig;
@@ -3080,10 +3330,10 @@
 
         // Test Connection
         async function testConnection() {
-            const webAppUrl = document.getElementById('webAppUrl').value;
+            const webAppUrl = GOOGLE_APPS_SCRIPT_URL; // ใช้ URL ที่ตั้งค่าไว้แล้ว
             
             if (!webAppUrl) {
-                showNotification('https://script.google.com/macros/s/AKfycbzcSH7cQ3kYiSvMkj49uounseXuUAwH6q2iFS85fZFV8FcwoC0X5ojPOJpRNt1PAuge/exec', 'warning');
+                showNotification('กรุณาตั้งค่า Google Apps Script URL ในโค้ด', 'warning');
                 return;
             }
             
@@ -3098,44 +3348,49 @@
                 
                 const data = await response.json();
                 
-                sheetsConfig = { webAppUrl, sheetName: 'Assets' };
-                localStorage.setItem('fmcgSheetsConfig', JSON.stringify(sheetsConfig));
-                
                 hideLoading();
                 
                 const resultDiv = document.getElementById('connectionResult');
-                resultDiv.style.display = 'block';
-                resultDiv.style.background = '#d1fae5';
-                resultDiv.style.border = '1px solid #10b981';
-                resultDiv.innerHTML = `
-                    <div style="display: flex; align-items: center; gap: 10px; color: #065f46;">
-                        <i class="fas fa-check-circle" style="font-size: 24px;"></i>
-                        <div>
-                            <strong>เชื่อมต่อสำเร็จ!</strong>
-                            <p style="margin-top: 5px;">พบข้อมูล ${data.data ? data.data.length - 1 : 0} รายการ</p>
+                if (resultDiv) {
+                    resultDiv.style.display = 'block';
+                    resultDiv.style.background = '#d1fae5';
+                    resultDiv.style.border = '1px solid #10b981';
+                    resultDiv.innerHTML = `
+                        <div style="display: flex; align-items: center; gap: 10px; color: #065f46;">
+                            <i class="fas fa-check-circle" style="font-size: 24px;"></i>
+                            <div>
+                                <strong>เชื่อมต่อสำเร็จ!</strong>
+                                <p style="margin-top: 5px;">พบข้อมูล ${data.data ? data.data.length - 1 : 0} รายการ</p>
+                                <p style="margin-top: 5px; font-size: 12px;">URL: ${webAppUrl.substring(0, 50)}...</p>
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                }
                 
                 updateSheetsStatus(true);
                 showNotification('✅ เชื่อมต่อ Google Apps Script สำเร็จ!', 'success');
+                
+                // โหลดข้อมูลอัตโนมัติ
+                await loadDataFromSheets();
                 
             } catch (error) {
                 hideLoading();
                 
                 const resultDiv = document.getElementById('connectionResult');
-                resultDiv.style.display = 'block';
-                resultDiv.style.background = '#fee2e2';
-                resultDiv.style.border = '1px solid #ef4444';
-                resultDiv.innerHTML = `
-                    <div style="display: flex; align-items: start; gap: 10px; color: #991b1b;">
-                        <i class="fas fa-times-circle" style="font-size: 24px;"></i>
-                        <div>
-                            <strong>เชื่อมต่อไม่สำเร็จ</strong>
-                            <p style="margin-top: 5px;">${error.message}</p>
+                if (resultDiv) {
+                    resultDiv.style.display = 'block';
+                    resultDiv.style.background = '#fee2e2';
+                    resultDiv.style.border = '1px solid #ef4444';
+                    resultDiv.innerHTML = `
+                        <div style="display: flex; align-items: start; gap: 10px; color: #991b1b;">
+                            <i class="fas fa-times-circle" style="font-size: 24px;"></i>
+                            <div>
+                                <strong>เชื่อมต่อไม่สำเร็จ</strong>
+                                <p style="margin-top: 5px;">${error.message}</p>
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                }
                 
                 showNotification('❌ ' + error.message, 'error');
             }
@@ -3163,12 +3418,12 @@
 
         // Save Settings
         function saveSettings() {
-            const webAppUrl = document.getElementById('webAppUrl').value;
             const companyName = document.getElementById('companyName').value;
             
-            sheetsConfig = { webAppUrl, sheetName: 'Assets' };
-            localStorage.setItem('fmcgSheetsConfig', JSON.stringify(sheetsConfig));
-            localStorage.setItem('fmcgCompanyName', companyName);
+            // บันทึกเฉพาะชื่อบริษัท เพราะ URL ตั้งค่าไว้แล้ว
+            if (companyName) {
+                localStorage.setItem('fmcgCompanyName', companyName);
+            }
             
             showNotification('✅ บันทึกการตั้งค่าสำเร็จ!', 'success');
         }
@@ -3238,25 +3493,30 @@
         }
 
         // Initialize on load
-        window.addEventListener('load', function() {
-            // Load data from localStorage
-            const savedAssets = localStorage.getItem('fmcgAssets');
-            if (savedAssets) {
-                assetsData = JSON.parse(savedAssets);
+        window.addEventListener('load', async function() {
+            // ตั้งค่า URL ใน form (ถ้ามี)
+            const webAppUrlInput = document.getElementById('webAppUrl');
+            if (webAppUrlInput) {
+                webAppUrlInput.value = GOOGLE_APPS_SCRIPT_URL;
             }
             
-            const savedConfig = localStorage.getItem('fmcgSheetsConfig');
-            if (savedConfig) {
-                sheetsConfig = JSON.parse(savedConfig);
-                document.getElementById('webAppUrl').value = sheetsConfig.webAppUrl;
-                updateSheetsStatus(true);
-            }
+            // อัปเดตสถานะการเชื่อมต่อ
+            updateSheetsStatus(true);
             
+            // โหลดข้อมูลจาก Google Sheets อัตโนมัติ
+            console.log('🔄 กำลังโหลดข้อมูลจาก Google Sheets...');
+            await loadDataFromSheets();
+            
+            // Load saved company name
             const savedCompany = localStorage.getItem('fmcgCompanyName');
             if (savedCompany) {
-                document.getElementById('companyName').value = savedCompany;
+                const companyInput = document.getElementById('companyName');
+                if (companyInput) {
+                    companyInput.value = savedCompany;
+                }
             }
             
+            // Initialize charts and update dashboard
             initDashboardCharts();
             updateDashboard();
 
@@ -3266,6 +3526,15 @@
                 updateLocationsPage();
                 updateMaintenancePage();
                 updateReportsPage();
+            }
+            
+            // 🔄 Auto-refresh ทุก 30 วินาที (ถ้าต้องการ)
+            // ปิดการ auto-refresh ถ้าไม่ต้องการให้ comment บรรทัดด้านล่าง
+            setInterval(async () => {
+                console.log('🔄 Auto-refresh: กำลังโหลดข้อมูลใหม่...');
+                await loadDataFromSheets();
+            }, 30000); // 30000 ms = 30 วินาที
+        });
             }
         });
 
