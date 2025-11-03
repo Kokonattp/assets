@@ -1,4 +1,3 @@
-
 /**
  * FMCG Asset Management - Barcode Scanner Module
  * สำหรับแสกน Barcode ด้วยกล้องมือถือ
