@@ -4211,9 +4211,10 @@
                 return;
             }
 
-            // Count assets by location
+            // 🔧 รวมทั้งสถานที่จาก assetsData และ customLocations
             const locationData = {};
             
+            // 1. เพิ่มสถานที่จาก assetsData (สถานที่ที่มีทรัพย์สิน)
             assetsData.forEach(asset => {
                 const loc = asset.location || 'ไม่ระบุ';
                 if (!locationData[loc]) {
@@ -4227,8 +4228,21 @@
                     locationData[loc].complete++;
                 }
             });
+            
+            // 2. เพิ่มสถานที่ทั้งหมดจาก getAllLocations (รวมสถานที่ว่าง)
+            if (typeof getAllLocations === 'function') {
+                const allLocations = getAllLocations();
+                allLocations.forEach(loc => {
+                    if (!locationData[loc]) {
+                        locationData[loc] = {
+                            total: 0,
+                            complete: 0
+                        };
+                    }
+                });
+            }
 
-            // Calculate totals
+            // คำนวณสถิติ
             const totalLocations = Object.keys(locationData).length;
             const totalAssets = assetsData.length;
             
@@ -4240,7 +4254,7 @@
             Object.entries(locationData).forEach(([loc, data]) => {
                 const maxCap = locationCapacity[loc] || 0;
                 if (maxCap > 0) {
-                    const usagePercent = (data.total / maxCap) * 100;
+                    const usagePercent = data.total > 0 ? (data.total / maxCap) * 100 : 0;
                     totalUsagePercent += usagePercent;
                     locationsWithCap++;
                     if (usagePercent >= 90) fullLocationsCount++;
@@ -4260,14 +4274,27 @@
             // Update location table
             const tbody = document.getElementById('locationsTableBody');
             if (tbody) {
-                tbody.innerHTML = Object.entries(locationData).map(([location, data]) => {
+                // เรียงลำดับสถานที่ตามชื่อ
+                const sortedLocations = Object.entries(locationData).sort((a, b) => {
+                    // ให้ "ไม่ระบุ" อยู่ท้ายสุด
+                    if (a[0] === 'ไม่ระบุ') return 1;
+                    if (b[0] === 'ไม่ระบุ') return -1;
+                    return a[0].localeCompare(b[0], 'th');
+                });
+                
+                tbody.innerHTML = sortedLocations.map(([location, data]) => {
                     const maxCap = locationCapacity[location] || 0;
-                    const usagePercent = maxCap > 0 ? (data.total / maxCap) * 100 : 0;
+                    const usagePercent = maxCap > 0 && data.total > 0 ? (data.total / maxCap) * 100 : 0;
+                    const isEmptyLocation = data.total === 0;
                     
+                    // กำหนดสถานะ
                     let statusClass, statusText;
                     if (maxCap === 0) {
                         statusClass = 'available';
                         statusText = 'ไม่กำหนด';
+                    } else if (data.total === 0) {
+                        statusClass = 'complete';
+                        statusText = 'ว่าง';
                     } else if (usagePercent >= 90) {
                         statusClass = 'broken';
                         statusText = 'เต็ม (>90%)';
@@ -4279,19 +4306,24 @@
                         statusText = 'ปกติ (<70%)';
                     }
                     
-                    const progressBarWidth = maxCap > 0 ? Math.min(usagePercent, 100) : 0;
+                    const progressBarWidth = maxCap > 0 && data.total > 0 ? Math.min(usagePercent, 100) : 0;
                     const progressBarColor = usagePercent >= 90 ? '#ef4444' : usagePercent >= 70 ? '#f59e0b' : '#10b981';
                     
                     return `
-                        <tr>
-                            <td><strong>${location}</strong></td>
+                        <tr ${isEmptyLocation ? 'style="background: #f9fafb;"' : ''}>
+                            <td>
+                                <strong>${location}</strong>
+                                ${isEmptyLocation ? '<span style="color: #999; font-size: 12px; margin-left: 8px;">(ว่าง)</span>' : ''}
+                            </td>
                             <td>-</td>
-                            <td style="text-align: center; font-weight: 600;">${data.total}</td>
+                            <td style="text-align: center; font-weight: 600; ${isEmptyLocation ? 'color: #999;' : ''}">
+                                ${data.total}
+                            </td>
                             <td style="text-align: center;">
                                 ${maxCap > 0 ? maxCap : '<span style="color: #999;">-</span>'}
                             </td>
                             <td>
-                                ${maxCap > 0 ? `
+                                ${maxCap > 0 && data.total > 0 ? `
                                     <div style="display: flex; align-items: center; gap: 10px;">
                                         <div style="flex: 1; background: #e5e5e5; border-radius: 10px; height: 20px; overflow: hidden;">
                                             <div style="background: ${progressBarColor}; width: ${progressBarWidth}%; height: 100%; 
