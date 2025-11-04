@@ -1,25 +1,215 @@
 /**
- * FMCG Asset Management - Fixed Asset Actions
- * แก้ไขปัญหา:
- * 1. สถานที่เก็บไม่แสดงใน Modal แก้ไข
- * 2. Modal โอนย้ายทำรายการไม่ได้
- * 3. Icon นับสตอค กรอกข้อมูลไม่ได้
+ * FMCG Asset Management - Complete Bug Fixes
+ * แก้ไขปัญหาทั้งหมด:
+ * 1. โอนย้ายไม่ได้ - ใช้ index แทน code
+ * 2. ไม่พบทรัพย์สิน - ใช้ item.id แทน code
+ * 3. Location/Department ไม่แสดงใน Modal แก้ไข
  */
 
 /**
- * แสดง Modal แก้ไขทรัพย์สิน (ปรับปรุงใหม่)
+ * ======================
+ * TRANSFER (โอนย้าย)
+ * ======================
+ */
+
+/**
+ * แสดง Modal โอนย้าย (ใช้ index)
+ */
+function showTransferModal(index) {
+    console.log('🔄 เปิด Modal โอนย้าย, index:', index);
+    
+    // ตรวจสอบ index
+    if (index < 0 || index >= assetsData.length) {
+        showNotification('❌ ไม่พบทรัพย์สิน (index ไม่ถูกต้อง)', 'error');
+        console.error('Invalid index:', index, 'assetsData.length:', assetsData.length);
+        return;
+    }
+    
+    const asset = assetsData[index];
+    console.log('📦 ทรัพย์สิน:', asset);
+    
+    // เก็บ index (ไม่ใช่ code)
+    document.getElementById('transferAssetId').value = index;
+    
+    // แสดงข้อมูลทรัพย์สิน
+    document.getElementById('transferAssetInfo').textContent = `${asset.code} - ${asset.name}`;
+    document.getElementById('currentLocation').textContent = asset.location || '-';
+    document.getElementById('currentDepartment').textContent = asset.department || '-';
+    
+    // ล้างฟอร์ม
+    document.getElementById('newLocation').value = '';
+    document.getElementById('newDepartment').value = '';
+    document.getElementById('transferReason').value = '';
+    document.getElementById('transferNote').value = '';
+    
+    // สร้าง datalist สำหรับ locations และ departments
+    if (typeof populateDatalist === 'function') {
+        populateDatalist();
+    } else {
+        // ถ้าไม่มี function populateDatalist ให้สร้างเอง
+        const locations = [...new Set(assetsData.map(a => a.location).filter(Boolean))].sort();
+        const locationList = document.getElementById('locationList');
+        if (locationList) {
+            locationList.innerHTML = locations.map(loc => `<option value="${loc}">`).join('');
+        }
+        
+        const departments = [...new Set(assetsData.map(a => a.department).filter(Boolean))].sort();
+        const departmentList = document.getElementById('departmentList');
+        if (departmentList) {
+            departmentList.innerHTML = departments.map(dept => `<option value="${dept}">`).join('');
+        }
+    }
+    
+    // เปิด Modal
+    if (typeof openModal === 'function') {
+        openModal('transferModal');
+    } else {
+        document.getElementById('transferModal').classList.add('active');
+    }
+}
+
+/**
+ * ยืนยันการโอนย้าย (ปรับปรุงใหม่ - ใช้ index)
+ */
+function confirmTransfer() {
+    const indexStr = document.getElementById('transferAssetId').value;
+    const index = parseInt(indexStr);
+    
+    console.log('🔍 ตรวจสอบข้อมูลโอนย้าย, index:', index, 'indexStr:', indexStr);
+    
+    // ตรวจสอบ index ก่อน
+    if (isNaN(index) || index < 0 || index >= assetsData.length) {
+        showNotification('❌ ไม่พบทรัพย์สิน (index: ' + indexStr + ')', 'error');
+        console.error('Invalid index:', indexStr, 'parsed:', index);
+        return;
+    }
+    
+    const newLocation = document.getElementById('newLocation').value.trim();
+    const newDepartment = document.getElementById('newDepartment').value.trim();
+    const reason = document.getElementById('transferReason').value.trim();
+    const note = document.getElementById('transferNote').value.trim();
+    
+    console.log('📝 ข้อมูลฟอร์ม:', {
+        index,
+        newLocation,
+        newDepartment,
+        reason,
+        note
+    });
+    
+    // Validate
+    if (!newLocation) {
+        showNotification('⚠️ กรุณาระบุสถานที่ใหม่', 'warning');
+        document.getElementById('newLocation').focus();
+        return;
+    }
+    
+    if (!newDepartment) {
+        showNotification('⚠️ กรุณาระบุแผนกใหม่', 'warning');
+        document.getElementById('newDepartment').focus();
+        return;
+    }
+    
+    if (!reason) {
+        showNotification('⚠️ กรุณาระบุเหตุผลในการโอนย้าย', 'warning');
+        document.getElementById('transferReason').focus();
+        return;
+    }
+    
+    const asset = assetsData[index];
+    const oldLocation = asset.location;
+    const oldDepartment = asset.department;
+    
+    console.log('✅ Validation ผ่าน, กำลังอัพเดท:', {
+        asset: asset.code,
+        from: { location: oldLocation, department: oldDepartment },
+        to: { location: newLocation, department: newDepartment }
+    });
+    
+    // อัพเดทข้อมูล
+    assetsData[index] = {
+        ...asset,
+        location: newLocation,
+        department: newDepartment,
+        lastUpdated: new Date().toISOString()
+    };
+    
+    // บันทึกลง localStorage
+    localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
+    
+    // 📝 บันทึกประวัติการโอนย้าย
+    if (typeof addAssetHistory === 'function') {
+        addAssetHistory(
+            asset.code,
+            'TRANSFER',
+            {
+                from: {
+                    location: oldLocation,
+                    department: oldDepartment
+                },
+                to: {
+                    location: newLocation,
+                    department: newDepartment
+                },
+                reason: reason,
+                note: note
+            },
+            `โอนย้ายจาก ${oldLocation} (${oldDepartment}) ไป ${newLocation} (${newDepartment})`
+        );
+    }
+    
+    // ซิงค์กับ Google Sheets
+    if (typeof sheetsConfig !== 'undefined' && sheetsConfig.webAppUrl) {
+        if (typeof syncToSheets === 'function') {
+            syncToSheets();
+        }
+    }
+    
+    // ปิด Modal
+    if (typeof closeModal === 'function') {
+        closeModal('transferModal');
+    } else {
+        document.getElementById('transferModal').classList.remove('active');
+    }
+    
+    // แสดง notification
+    showNotification(
+        `✅ โอนย้าย "${asset.name}" สำเร็จ!\n📍 ${oldLocation} → ${newLocation}\n🏢 ${oldDepartment} → ${newDepartment}`, 
+        'success'
+    );
+    
+    console.log('🎉 โอนย้ายสำเร็จ!');
+    
+    // อัพเดทหน้าจอ
+    if (typeof updateAssetsPage === 'function') updateAssetsPage();
+    if (typeof updateDashboard === 'function') updateDashboard();
+    if (typeof updateDepartmentPage === 'function') updateDepartmentPage();
+    if (typeof updateLocationsPage === 'function') updateLocationsPage();
+}
+
+/**
+ * ======================
+ * EDIT (แก้ไข)
+ * ======================
+ */
+
+/**
+ * แสดง Modal แก้ไขทรัพย์สิน
  */
 function editAsset(code) {
     const asset = assetsData.find(a => a.code === code);
     if (!asset) {
         showNotification('❌ ไม่พบทรัพย์สิน', 'error');
+        console.error('Asset not found:', code);
         return;
     }
     
     console.log('📝 กำลังแก้ไขทรัพย์สิน:', asset);
     
-    // อัพเดท location และ department dropdowns ให้แสดงค่าที่มีจริง
-    updateLocationDropdowns();
+    // อัพเดท location และ department dropdowns
+    if (typeof updateLocationDropdowns === 'function') {
+        updateLocationDropdowns();
+    }
     
     // รอให้ dropdown พร้อมก่อนเติมข้อมูล
     setTimeout(() => {
@@ -39,9 +229,8 @@ function editAsset(code) {
         const locationSelect = document.getElementById('editLocation');
         const departmentSelect = document.getElementById('editDepartment');
         
-        // เช็คว่ามีค่าที่ต้องการใน dropdown หรือไม่
-        if (asset.location) {
-            // ลองหาใน options ที่มีอยู่
+        // Location
+        if (asset.location && locationSelect) {
             let locationFound = false;
             for (let i = 0; i < locationSelect.options.length; i++) {
                 if (locationSelect.options[i].value === asset.location || 
@@ -56,11 +245,12 @@ function editAsset(code) {
             if (!locationFound) {
                 const newOption = new Option(asset.location, asset.location, true, true);
                 locationSelect.add(newOption);
+                console.log('➕ เพิ่ม location ใหม่:', asset.location);
             }
         }
         
-        if (asset.department) {
-            // ลองหาใน options ที่มีอยู่
+        // Department
+        if (asset.department && departmentSelect) {
             let departmentFound = false;
             for (let i = 0; i < departmentSelect.options.length; i++) {
                 if (departmentSelect.options[i].value === asset.department || 
@@ -75,6 +265,7 @@ function editAsset(code) {
             if (!departmentFound) {
                 const newOption = new Option(asset.department, asset.department, true, true);
                 departmentSelect.add(newOption);
+                console.log('➕ เพิ่ม department ใหม่:', asset.department);
             }
         }
         
@@ -82,8 +273,8 @@ function editAsset(code) {
         document.getElementById('editDescription').value = asset.description || '';
         
         console.log('✅ เติมข้อมูลสำเร็จ:', {
-            location: locationSelect.value,
-            department: departmentSelect.value
+            location: locationSelect ? locationSelect.value : 'N/A',
+            department: departmentSelect ? departmentSelect.value : 'N/A'
         });
     }, 100);
     
@@ -140,7 +331,7 @@ function saveEditAsset() {
         department,
         status,
         description,
-        value: price * quantity, // คำนวณมูลค่ารวม
+        value: price * quantity,
         lastUpdated: new Date().toISOString()
     };
     
@@ -154,175 +345,64 @@ function saveEditAsset() {
         logAssetUpdate(oldAsset, newAsset);
     }
     
-    // ถ้ามีการเชื่อมต่อ Google Sheets ให้ซิงค์
+    // ซิงค์กับ Google Sheets
     if (typeof sheetsConfig !== 'undefined' && sheetsConfig.webAppUrl) {
-        syncToSheets();
+        if (typeof syncToSheets === 'function') {
+            syncToSheets();
+        }
     }
     
     // ปิด Modal
-    closeModal('editAssetModal');
+    if (typeof closeModal === 'function') {
+        closeModal('editAssetModal');
+    } else {
+        document.getElementById('editAssetModal').classList.remove('active');
+    }
     
     // แสดง notification
     showNotification(`✅ แก้ไขทรัพย์สิน "${name}" สำเร็จ!`, 'success');
     
     // อัพเดทหน้าจอ
-    updateAssetsPage();
-    updateDashboard();
+    if (typeof updateAssetsPage === 'function') updateAssetsPage();
+    if (typeof updateDashboard === 'function') updateDashboard();
 }
 
 /**
- * เปิด Modal โอนย้าย (ปรับปรุงใหม่)
+ * ======================
+ * STOCK COUNT (นับสตอค)
+ * ======================
  */
-function openTransferModal(code) {
-    const asset = assetsData.find(a => a.code === code);
+
+/**
+ * เปิด Modal นับสตอค (รองรับทั้ง code และ id)
+ */
+function openStockCountModal(codeOrId) {
+    console.log('📊 เปิด Modal นับสตอค, input:', codeOrId);
+    
+    // ลองหาจาก code หรือ id
+    let asset = assetsData.find(a => a.code === codeOrId);
+    
+    // ถ้าไม่เจอ ลองหาจาก id (สำหรับกรณีที่ส่ง id มา)
+    if (!asset && typeof codeOrId === 'string') {
+        asset = assetsData.find(a => a.id === codeOrId);
+    }
+    
+    // ถ้ายังไม่เจอ ลองหาจาก index
+    if (!asset && !isNaN(codeOrId)) {
+        const index = parseInt(codeOrId);
+        if (index >= 0 && index < assetsData.length) {
+            asset = assetsData[index];
+        }
+    }
+    
     if (!asset) {
-        showNotification('❌ ไม่พบทรัพย์สิน', 'error');
+        showNotification('❌ ไม่พบทรัพย์สิน (input: ' + codeOrId + ')', 'error');
+        console.error('Asset not found:', codeOrId, 'Total assets:', assetsData.length);
+        console.log('Available codes:', assetsData.map(a => a.code).slice(0, 5), '...');
         return;
     }
     
-    console.log('🔄 กำลังโอนย้ายทรัพย์สิน:', asset);
-    
-    // เก็บข้อมูลทรัพย์สิน
-    document.getElementById('transferAssetId').value = asset.code;
-    
-    // แสดงข้อมูลทรัพย์สิน
-    document.getElementById('transferAssetInfo').textContent = 
-        `${asset.code} - ${asset.name}`;
-    
-    // แสดงข้อมูลปัจจุบัน
-    document.getElementById('currentLocation').textContent = asset.location || '-';
-    document.getElementById('currentDepartment').textContent = asset.department || '-';
-    
-    // ล้างฟอร์ม
-    document.getElementById('newLocation').value = '';
-    document.getElementById('newDepartment').value = '';
-    document.getElementById('transferReason').value = '';
-    document.getElementById('transferNote').value = '';
-    
-    // อัพเดท datalists
-    updateLocationDropdowns();
-    
-    // แสดง Modal
-    document.getElementById('transferModal').classList.add('active');
-}
-
-/**
- * ยืนยันการโอนย้าย (แก้ไขใหม่)
- */
-function confirmTransfer() {
-    const code = document.getElementById('transferAssetId').value;
-    const newLocation = document.getElementById('newLocation').value.trim();
-    const newDepartment = document.getElementById('newDepartment').value.trim();
-    const reason = document.getElementById('transferReason').value.trim();
-    const note = document.getElementById('transferNote').value.trim();
-    
-    console.log('🔍 ตรวจสอบข้อมูล:', {
-        code,
-        newLocation,
-        newDepartment,
-        reason,
-        note
-    });
-    
-    // 🔧 แก้ไข: Validate แบบละเอียด
-    if (!code) {
-        showNotification('❌ ไม่พบรหัสทรัพย์สิน', 'error');
-        return;
-    }
-    
-    if (!newLocation) {
-        showNotification('⚠️ กรุณาระบุสถานที่ใหม่', 'warning');
-        document.getElementById('newLocation').focus();
-        return;
-    }
-    
-    if (!newDepartment) {
-        showNotification('⚠️ กรุณาระบุแผนกใหม่', 'warning');
-        document.getElementById('newDepartment').focus();
-        return;
-    }
-    
-    if (!reason) {
-        showNotification('⚠️ กรุณาระบุเหตุผลในการโอนย้าย', 'warning');
-        document.getElementById('transferReason').focus();
-        return;
-    }
-    
-    // หาทรัพย์สิน
-    const assetIndex = assetsData.findIndex(a => a.code === code);
-    if (assetIndex === -1) {
-        showNotification('❌ ไม่พบทรัพย์สิน', 'error');
-        return;
-    }
-    
-    const asset = assetsData[assetIndex];
-    const oldLocation = asset.location;
-    const oldDepartment = asset.department;
-    
-    // อัพเดทข้อมูล
-    assetsData[assetIndex] = {
-        ...asset,
-        location: newLocation,
-        department: newDepartment,
-        lastUpdated: new Date().toISOString()
-    };
-    
-    // บันทึกลง localStorage
-    localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
-    
-    // 📝 บันทึกประวัติการโอนย้าย
-    if (typeof addAssetHistory === 'function') {
-        addAssetHistory(
-            code,
-            'TRANSFER',
-            {
-                from: {
-                    location: oldLocation,
-                    department: oldDepartment
-                },
-                to: {
-                    location: newLocation,
-                    department: newDepartment
-                },
-                reason: reason,
-                note: note
-            },
-            `โอนย้ายจาก ${oldLocation} (${oldDepartment}) ไป ${newLocation} (${newDepartment})`
-        );
-    }
-    
-    // ซิงค์กับ Google Sheets
-    if (typeof sheetsConfig !== 'undefined' && sheetsConfig.webAppUrl) {
-        syncToSheets();
-    }
-    
-    // ปิด Modal
-    closeModal('transferModal');
-    
-    // แสดง notification
-    showNotification(
-        `✅ โอนย้าย "${asset.name}" สำเร็จ!\n📍 ${oldLocation} → ${newLocation}\n🏢 ${oldDepartment} → ${newDepartment}`, 
-        'success'
-    );
-    
-    // อัพเดทหน้าจอ
-    updateAssetsPage();
-    updateDashboard();
-    updateDepartmentPage();
-    updateLocationsPage();
-}
-
-/**
- * เปิด Modal นับสตอค (ปรับปรุงใหม่)
- */
-function openStockCountModal(code) {
-    const asset = assetsData.find(a => a.code === code);
-    if (!asset) {
-        showNotification('❌ ไม่พบทรัพย์สิน', 'error');
-        return;
-    }
-    
-    console.log('📊 กำลังนับสตอค:', asset);
+    console.log('✅ พบทรัพย์สิน:', asset);
     
     // ตรวจสอบว่าเริ่มนับสตอคแล้วหรือยัง
     if (!stockCountData || stockCountData.length === 0) {
@@ -331,13 +411,16 @@ function openStockCountModal(code) {
     }
     
     // ตรวจสอบว่าทรัพย์สินนี้อยู่ในรายการนับสตอคหรือไม่
-    const stockItem = stockCountData.find(s => s.code === code);
+    const stockItem = stockCountData.find(s => s.code === asset.code);
     if (!stockItem) {
         showNotification('⚠️ ทรัพย์สินนี้ไม่อยู่ในรายการนับสตอคปัจจุบัน', 'warning');
+        console.log('Stock count data:', stockCountData.map(s => s.code).slice(0, 5));
         return;
     }
     
-    // สร้าง Modal นับสตอคแบบ Custom
+    console.log('📦 Stock item:', stockItem);
+    
+    // สร้าง Modal นับสตอค
     const modal = document.createElement('div');
     modal.className = 'modal active';
     modal.id = 'quickStockCountModal';
@@ -347,16 +430,9 @@ function openStockCountModal(code) {
         <div class="modal-content" style="max-width: 500px; animation: modalSlideIn 0.3s ease;">
             <style>
                 @keyframes modalSlideIn {
-                    from {
-                        transform: translateY(-50px);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translateY(0);
-                        opacity: 1;
-                    }
+                    from { transform: translateY(-50px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
                 }
-                
                 .stock-modal-header {
                     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
                     color: white;
@@ -365,18 +441,15 @@ function openStockCountModal(code) {
                     text-align: center;
                     margin: -20px -20px 20px -20px;
                 }
-                
                 .stock-icon {
                     font-size: 64px;
                     margin-bottom: 10px;
                     animation: bounce 1s ease infinite;
                 }
-                
                 @keyframes bounce {
                     0%, 100% { transform: translateY(0); }
                     50% { transform: translateY(-10px); }
                 }
-                
                 .asset-detail-box {
                     background: #f0f9f9;
                     border: 2px solid var(--primary-light);
@@ -384,35 +457,29 @@ function openStockCountModal(code) {
                     padding: 15px;
                     margin: 20px 0;
                 }
-                
                 .asset-detail-row {
                     display: flex;
                     justify-content: space-between;
                     margin: 8px 0;
                     padding: 5px 0;
                 }
-                
                 .asset-detail-label {
                     color: #666;
                     font-weight: 500;
                 }
-                
                 .asset-detail-value {
                     color: var(--primary);
                     font-weight: 600;
                 }
-                
                 .form-group-inline {
                     margin: 15px 0;
                 }
-                
                 .form-group-inline label {
                     display: block;
                     margin-bottom: 8px;
                     color: #333;
                     font-weight: 600;
                 }
-                
                 .form-group-inline input,
                 .form-group-inline textarea {
                     width: 100%;
@@ -422,19 +489,16 @@ function openStockCountModal(code) {
                     font-size: 16px;
                     transition: border 0.3s;
                 }
-                
                 .form-group-inline input:focus,
                 .form-group-inline textarea:focus {
                     border-color: var(--primary);
                     outline: none;
                 }
-                
                 .count-actions {
                     display: flex;
                     gap: 10px;
                     margin-top: 20px;
                 }
-                
                 .btn-count {
                     flex: 1;
                     padding: 15px;
@@ -449,22 +513,18 @@ function openStockCountModal(code) {
                     justify-content: center;
                     gap: 8px;
                 }
-                
                 .btn-count-cancel {
                     background: #f3f4f6;
                     color: #6b7280;
                 }
-                
                 .btn-count-cancel:hover {
                     background: #e5e7eb;
                     transform: translateY(-2px);
                 }
-                
                 .btn-count-save {
                     background: linear-gradient(135deg, var(--accent) 0%, var(--primary) 100%);
                     color: white;
                 }
-                
                 .btn-count-save:hover {
                     transform: translateY(-2px);
                     box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
@@ -516,7 +576,7 @@ function openStockCountModal(code) {
                     <i class="fas fa-times"></i>
                     ยกเลิก
                 </button>
-                <button class="btn-count btn-count-save" onclick="saveQuickStockCount('${code}')">
+                <button class="btn-count btn-count-save" onclick="saveQuickStockCount('${asset.code}')">
                     <i class="fas fa-save"></i>
                     บันทึกการนับ
                 </button>
@@ -544,7 +604,7 @@ function openStockCountModal(code) {
 }
 
 /**
- * บันทึกการนับสตอคแบบเร็ว
+ * บันทึกการนับสตอค
  */
 function saveQuickStockCount(code) {
     const qty = document.getElementById('quickCountQty').value;
@@ -614,7 +674,7 @@ function saveQuickStockCount(code) {
 }
 
 /**
- * ปิด Modal นับสตอคแบบเร็ว
+ * ปิด Modal นับสตอค
  */
 function closeQuickStockCount() {
     const modal = document.getElementById('quickStockCountModal');
@@ -627,7 +687,13 @@ function closeQuickStockCount() {
 }
 
 /**
- * ลบทรัพย์สิน (เหมือนเดิม)
+ * ======================
+ * DELETE (ลบ)
+ * ======================
+ */
+
+/**
+ * ลบทรัพย์สิน
  */
 function deleteAsset(code) {
     const asset = assetsData.find(a => a.code === code);
@@ -646,16 +712,9 @@ function deleteAsset(code) {
         <div class="modal-content" style="max-width: 450px; animation: modalSlideIn 0.3s ease;">
             <style>
                 @keyframes modalSlideIn {
-                    from {
-                        transform: translateY(-50px);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translateY(0);
-                        opacity: 1;
-                    }
+                    from { transform: translateY(-50px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
                 }
-                
                 .delete-modal-header {
                     background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
                     color: white;
@@ -664,19 +723,16 @@ function deleteAsset(code) {
                     text-align: center;
                     margin: -20px -20px 20px -20px;
                 }
-                
                 .delete-icon {
                     font-size: 64px;
                     margin-bottom: 10px;
                     animation: shake 0.5s ease;
                 }
-                
                 @keyframes shake {
                     0%, 100% { transform: translateX(0); }
                     25% { transform: translateX(-10px) rotate(-5deg); }
                     75% { transform: translateX(10px) rotate(5deg); }
                 }
-                
                 .asset-info-box {
                     background: #fee;
                     border: 2px solid #fcc;
@@ -684,7 +740,6 @@ function deleteAsset(code) {
                     padding: 15px;
                     margin: 20px 0;
                 }
-                
                 .asset-info-row {
                     display: flex;
                     justify-content: space-between;
@@ -692,21 +747,17 @@ function deleteAsset(code) {
                     padding: 5px 0;
                     border-bottom: 1px dashed #fcc;
                 }
-                
                 .asset-info-row:last-child {
                     border-bottom: none;
                 }
-                
                 .asset-info-label {
                     color: #666;
                     font-weight: 500;
                 }
-                
                 .asset-info-value {
                     color: #ef4444;
                     font-weight: 600;
                 }
-                
                 .warning-text {
                     background: #fef3c7;
                     border-left: 4px solid #f59e0b;
@@ -716,13 +767,11 @@ function deleteAsset(code) {
                     font-size: 14px;
                     color: #92400e;
                 }
-                
                 .delete-actions {
                     display: flex;
                     gap: 10px;
                     margin-top: 20px;
                 }
-                
                 .btn-delete-confirm {
                     flex: 1;
                     padding: 15px;
@@ -737,22 +786,18 @@ function deleteAsset(code) {
                     justify-content: center;
                     gap: 8px;
                 }
-                
                 .btn-cancel {
                     background: #f3f4f6;
                     color: #6b7280;
                 }
-                
                 .btn-cancel:hover {
                     background: #e5e7eb;
                     transform: translateY(-2px);
                 }
-                
                 .btn-delete-yes {
                     background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
                     color: white;
                 }
-                
                 .btn-delete-yes:hover {
                     background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
                     transform: translateY(-2px);
@@ -808,7 +853,6 @@ function deleteAsset(code) {
     
     document.body.appendChild(deleteModal);
     
-    // Close on outside click
     deleteModal.addEventListener('click', (e) => {
         if (e.target === deleteModal) {
             closeDeleteModal();
@@ -817,7 +861,7 @@ function deleteAsset(code) {
 }
 
 /**
- * ยืนยันการลบทรัพย์สิน
+ * ยืนยันการลบ
  */
 function confirmDeleteAsset(code) {
     const asset = assetsData.find(a => a.code === code);
@@ -827,37 +871,34 @@ function confirmDeleteAsset(code) {
         return;
     }
     
-    // 📝 บันทึกประวัติการลบก่อนลบจริง
+    // บันทึกประวัติการลบ
     if (typeof logAssetDeletion === 'function') {
         logAssetDeletion(asset);
     }
     
-    // ลบออกจาก array
+    // ลบ
     assetsData = assetsData.filter(a => a.code !== code);
-    
-    // บันทึกลง localStorage
     localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
     
-    // ลบออกจาก Stock Count ด้วย (ถ้ามี)
+    // ลบจาก Stock Count
     if (stockCountData && stockCountData.length > 0) {
         stockCountData = stockCountData.filter(s => s.code !== code);
         localStorage.setItem('fmcgStockCount', JSON.stringify(stockCountData));
     }
     
-    // ถ้ามีการเชื่อมต่อ Google Sheets ให้ซิงค์
+    // ซิงค์
     if (typeof sheetsConfig !== 'undefined' && sheetsConfig.webAppUrl) {
-        syncToSheets();
+        if (typeof syncToSheets === 'function') {
+            syncToSheets();
+        }
     }
     
-    // ปิด Modal
     closeDeleteModal();
-    
-    // แสดง notification
     showNotification(`✅ ลบทรัพย์สิน "${asset.name}" สำเร็จ!`, 'success');
     
     // อัพเดทหน้าจอ
-    updateAssetsPage();
-    updateDashboard();
+    if (typeof updateAssetsPage === 'function') updateAssetsPage();
+    if (typeof updateDashboard === 'function') updateDashboard();
     if (typeof updateDepartmentPage === 'function') updateDepartmentPage();
     if (typeof updateLocationsPage === 'function') updateLocationsPage();
 }
@@ -878,10 +919,10 @@ function closeDeleteModal() {
 // Export functions
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
+        showTransferModal,
+        confirmTransfer,
         editAsset,
         saveEditAsset,
-        openTransferModal,
-        confirmTransfer,
         openStockCountModal,
         saveQuickStockCount,
         closeQuickStockCount,
@@ -890,3 +931,5 @@ if (typeof module !== 'undefined' && module.exports) {
         closeDeleteModal
     };
 }
+
+console.log('✅ Asset Actions (Complete Bug Fixes) loaded successfully!');
