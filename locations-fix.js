@@ -1,15 +1,20 @@
 /**
- * FMCG Asset Management - Locations Page Fix
- * แก้ไขปัญหา:
- * 1. คลังอื่นไม่แสดงในรายการ (แสดงเฉพาะคลังที่มีทรัพย์สิน)
- * 2. Modal จัดการสถานที่ไม่เปิด
- * 
- * วิธีใช้: เพิ่มโค้ดนี้ในไฟล์ index.html หรือแทนที่ฟังก์ชันเดิม
+ * FMCG Asset Management - Locations Manager with Google Sheets Sync
+ * Full Version - แก้ไขปัญหาและเพิ่มฟีเจอร์:
+ * 1. คลังอื่นไม่แสดงในรายการ (แสดงเฉพาะคลังที่มีทรัพย์สิน) ✓
+ * 2. Modal จัดการสถานที่ไม่เปิด ✓
+ * 3. บันทึกข้อมูลลง Google Sheets ✓
+ * 4. โหลดข้อมูลจาก Google Sheets ✓
+ * 5. จัดการสถานที่ (เพิ่ม/แก้/ลบ) ✓
  */
 
+// ===== CONFIG =====
+const SHEETS_API_URL = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec'; // แก้ไข URL ของคุณที่นี่
+
+// ===== MAIN FUNCTIONS =====
+
 /**
- * ===== แก้ไข updateLocationsPage() =====
- * เพิ่มการแสดงสถานที่ที่ไม่มีทรัพย์สินด้วย
+ * อัพเดทหน้า Locations Page
  */
 function updateLocationsPage() {
     if (assetsData.length === 0) {
@@ -26,7 +31,7 @@ function updateLocationsPage() {
         return;
     }
 
-    // 🔧 แก้ไข: รวมทั้งสถานที่จาก assetsData และ customLocations
+    // รวมทั้งสถานที่จาก assetsData และ customLocations
     const locationData = {};
     
     // เพิ่มสถานที่จาก assetsData
@@ -44,7 +49,7 @@ function updateLocationsPage() {
         }
     });
     
-    // 🔧 แก้ไข: เพิ่มสถานที่จาก customLocations ที่ยังไม่มีในรายการ
+    // เพิ่มสถานที่จาก customLocations ที่ยังไม่มีในรายการ
     if (typeof getAllLocations === 'function') {
         const allLocations = getAllLocations();
         allLocations.forEach(loc => {
@@ -56,7 +61,6 @@ function updateLocationsPage() {
             }
         });
     } else if (typeof customLocations !== 'undefined' && Array.isArray(customLocations)) {
-        // ถ้าไม่มี getAllLocations ให้ใช้ customLocations โดยตรง
         customLocations.forEach(locObj => {
             const loc = locObj.name;
             if (!locationData[loc]) {
@@ -100,9 +104,7 @@ function updateLocationsPage() {
     // Update location table
     const tbody = document.getElementById('locationsTableBody');
     if (tbody) {
-        // เรียงลำดับสถานที่ตามชื่อ
         const sortedLocations = Object.entries(locationData).sort((a, b) => {
-            // ให้ "ไม่ระบุ" อยู่ท้ายสุด
             if (a[0] === 'ไม่ระบุ') return 1;
             if (b[0] === 'ไม่ระบุ') return -1;
             return a[0].localeCompare(b[0], 'th');
@@ -132,8 +134,6 @@ function updateLocationsPage() {
             
             const progressBarWidth = maxCap > 0 && data.total > 0 ? Math.min(usagePercent, 100) : 0;
             const progressBarColor = usagePercent >= 90 ? '#ef4444' : usagePercent >= 70 ? '#f59e0b' : '#10b981';
-            
-            // 🔧 แก้ไข: แสดงว่าสถานที่ว่างหรือไม่
             const isEmptyLocation = data.total === 0;
             
             return `
@@ -175,12 +175,311 @@ function updateLocationsPage() {
 }
 
 /**
- * ===== ตรวจสอบและแก้ไข Modal =====
+ * เปิด Modal จัดการสถานที่
+ */
+function openManageLocationsModal() {
+    loadManageLocationsTable();
+    openModal('manageLocationsModal');
+}
+
+/**
+ * โหลดตารางในหน้าจัดการสถานที่
+ */
+function loadManageLocationsTable() {
+    const tbody = document.getElementById('manageLocationsTableBody');
+    if (!tbody) return;
+    
+    const allLocations = typeof getAllLocations === 'function' 
+        ? getAllLocations() 
+        : [...new Set(assetsData.map(a => a.location).filter(Boolean))];
+    
+    const locationCounts = {};
+    assetsData.forEach(asset => {
+        const loc = asset.location || 'ไม่ระบุ';
+        locationCounts[loc] = (locationCounts[loc] || 0) + 1;
+    });
+    
+    tbody.innerHTML = allLocations.map(location => {
+        const count = locationCounts[location] || 0;
+        const capacity = locationCapacity[location] || '-';
+        const isCustom = customLocations && customLocations.some(l => l.name === location);
+        const canDelete = isCustom && count === 0;
+
+        return `
+            <tr>
+                <td>
+                    <strong>${location}</strong>
+                    ${isCustom ? '<span class="badge complete" style="margin-left: 10px; font-size: 10px;">กำหนดเอง</span>' : ''}
+                </td>
+                <td style="text-align: center; font-weight: 600;">${count}</td>
+                <td style="text-align: center;">${capacity !== '-' ? capacity : '<span style="color: #999;">ไม่ระบุ</span>'}</td>
+                <td style="text-align: center;">
+                    <button class="action-btn primary" onclick="editCapacity('${location}', ${count})" title="ตั้งค่าความจุ">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    ${canDelete ? `
+                        <button class="action-btn danger" onclick="deleteLocation('${location}')" title="ลบสถานที่">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    ` : ''}
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+/**
+ * แก้ไขความจุสถานที่
+ */
+function editCapacity(location, currentAssets) {
+    const currentCapacity = locationCapacity[location] || 0;
+    const newCapacity = prompt(
+        `ตั้งค่าความจุสำหรับ: ${location}\n\n` +
+        `จำนวนทรัพย์สินปัจจุบัน: ${currentAssets}\n` +
+        `ความจุปัจจุบัน: ${currentCapacity > 0 ? currentCapacity : 'ไม่กำหนด'}\n\n` +
+        `กรอกความจุใหม่ (0 = ไม่กำหนด):`,
+        currentCapacity
+    );
+    
+    if (newCapacity === null) return;
+    
+    const capacity = parseInt(newCapacity);
+    if (isNaN(capacity) || capacity < 0) {
+        alert('❌ กรุณากรอกตัวเลขที่ถูกต้อง (0 หรือมากกว่า)');
+        return;
+    }
+    
+    if (capacity > 0 && capacity < currentAssets) {
+        const confirm = window.confirm(
+            `⚠️ คำเตือน!\n\n` +
+            `ความจุที่กำหนด (${capacity}) น้อยกว่าจำนวนทรัพย์สินปัจจุบัน (${currentAssets})\n\n` +
+            `ต้องการดำเนินการต่อหรือไม่?`
+        );
+        if (!confirm) return;
+    }
+    
+    locationCapacity[location] = capacity;
+    localStorage.setItem('fmcgLocationCapacity', JSON.stringify(locationCapacity));
+    
+    loadManageLocationsTable();
+    updateLocationsPage();
+    
+    showNotification(`✅ อัพเดทความจุ "${location}" เป็น ${capacity > 0 ? capacity : 'ไม่กำหนด'} สำเร็จ!`, 'success');
+}
+
+/**
+ * ลบสถานที่
+ */
+function deleteLocation(location) {
+    const assetCount = assetsData.filter(a => a.location === location).length;
+    
+    if (assetCount > 0) {
+        alert(`❌ ไม่สามารถลบได้!\n\nสถานที่ "${location}" มีทรัพย์สิน ${assetCount} รายการ\nกรุณาย้ายหรือลบทรัพย์สินก่อน`);
+        return;
+    }
+    
+    const confirm = window.confirm(`ยืนยันการลบสถานที่ "${location}"?`);
+    if (!confirm) return;
+    
+    // ลบจาก customLocations
+    if (typeof customLocations !== 'undefined') {
+        customLocations = customLocations.filter(l => l.name !== location);
+        localStorage.setItem('fmcgCustomLocations', JSON.stringify(customLocations));
+    }
+    
+    // ลบจาก locationCapacity
+    delete locationCapacity[location];
+    localStorage.setItem('fmcgLocationCapacity', JSON.stringify(locationCapacity));
+    
+    loadManageLocationsTable();
+    updateLocationsPage();
+    
+    showNotification(`✅ ลบสถานที่ "${location}" สำเร็จ!`, 'success');
+}
+
+/**
+ * เพิ่มสถานที่ใหม่ (จากปุ่ม "เพิ่มสถานที่")
+ */
+function openAddLocationModal() {
+    openModal('addLocationModal');
+    document.getElementById('newLocationName').value = '';
+    document.getElementById('newLocationCapacity').value = '';
+    if (document.getElementById('newLocationDescription')) {
+        document.getElementById('newLocationDescription').value = '';
+    }
+}
+
+/**
+ * บันทึกสถานที่ใหม่
+ */
+function saveNewLocation() {
+    const nameInput = document.getElementById('newLocationName');
+    const capacityInput = document.getElementById('newLocationCapacity');
+    
+    const name = nameInput.value.trim();
+    if (!name) {
+        alert('❌ กรุณากรอกชื่อสถานที่');
+        nameInput.focus();
+        return;
+    }
+    
+    // ตรวจสอบว่ามีอยู่แล้วหรือไม่
+    const allLocations = typeof getAllLocations === 'function' 
+        ? getAllLocations() 
+        : [...new Set(assetsData.map(a => a.location).filter(Boolean))];
+    
+    if (allLocations.includes(name)) {
+        alert(`❌ สถานที่ "${name}" มีอยู่แล้วในระบบ`);
+        return;
+    }
+    
+    // เพิ่มลง customLocations
+    if (typeof customLocations === 'undefined') {
+        window.customLocations = [];
+    }
+    
+    const capacity = parseInt(capacityInput.value) || 0;
+    
+    customLocations.push({
+        name: name,
+        capacity: capacity
+    });
+    localStorage.setItem('fmcgCustomLocations', JSON.stringify(customLocations));
+    
+    // เพิ่มลง locationCapacity
+    if (capacity > 0) {
+        locationCapacity[name] = capacity;
+        localStorage.setItem('fmcgLocationCapacity', JSON.stringify(locationCapacity));
+    }
+    
+    closeModal('addLocationModal');
+    updateLocationsPage();
+    
+    showNotification(`✅ เพิ่มสถานที่ "${name}" สำเร็จ!`, 'success');
+}
+
+// ===== GOOGLE SHEETS SYNC =====
+
+/**
+ * บันทึกข้อมูลสถานที่ลง Google Sheets
+ */
+async function syncLocationsToSheets() {
+    try {
+        showNotification('⏳ กำลังบันทึกข้อมูลลง Google Sheets...', 'info');
+        
+        const allLocations = typeof getAllLocations === 'function' 
+            ? getAllLocations() 
+            : [...new Set(assetsData.map(a => a.location).filter(Boolean))];
+        
+        const rows = [];
+        
+        allLocations.forEach(location => {
+            const capacity = locationCapacity[location] || 0;
+            const assetCount = assetsData.filter(a => a.location === location).length;
+            const isCustom = customLocations && customLocations.some(l => l.name === location);
+            
+            rows.push([
+                location,
+                capacity,
+                assetCount,
+                isCustom ? 'Yes' : 'No',
+                new Date().toISOString()
+            ]);
+        });
+        
+        const response = await fetch(SHEETS_API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'saveLocations',
+                data: rows
+            })
+        });
+        
+        showNotification('✅ บันทึกข้อมูลลง Google Sheets สำเร็จ!', 'success');
+        return true;
+        
+    } catch (error) {
+        console.error('Error saving to sheets:', error);
+        showNotification('❌ เกิดข้อผิดพลาด: ' + error.message, 'error');
+        return false;
+    }
+}
+
+/**
+ * โหลดข้อมูลสถานที่จาก Google Sheets
+ */
+async function loadLocationsFromSheets() {
+    try {
+        showNotification('⏳ กำลังโหลดข้อมูลจาก Google Sheets...', 'info');
+        
+        const response = await fetch(SHEETS_API_URL + '?action=getLocations');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            // ข้าม header row
+            const locationsData = result.data.slice(1);
+            
+            // อัพเดทข้อมูล
+            locationCapacity = {};
+            if (typeof customLocations === 'undefined') {
+                window.customLocations = [];
+            } else {
+                customLocations = [];
+            }
+            
+            locationsData.forEach(row => {
+                if (row[0]) {
+                    const name = row[0];
+                    const capacity = parseInt(row[1]) || 0;
+                    const isCustom = row[3] === 'Yes';
+                    
+                    locationCapacity[name] = capacity;
+                    
+                    if (isCustom) {
+                        customLocations.push({
+                            name: name,
+                            capacity: capacity
+                        });
+                    }
+                }
+            });
+            
+            // บันทึก localStorage
+            localStorage.setItem('fmcgLocationCapacity', JSON.stringify(locationCapacity));
+            localStorage.setItem('fmcgCustomLocations', JSON.stringify(customLocations));
+            
+            // อัพเดทหน้า
+            updateLocationsPage();
+            if (document.getElementById('manageLocationsModal').classList.contains('active')) {
+                loadManageLocationsTable();
+            }
+            
+            showNotification('✅ โหลดข้อมูลจาก Google Sheets สำเร็จ!', 'success');
+            return true;
+        }
+        
+        showNotification('⚠️ ไม่พบข้อมูลสถานที่ใน Google Sheets', 'warning');
+        return false;
+        
+    } catch (error) {
+        console.error('Error loading from sheets:', error);
+        showNotification('❌ เกิดข้อผิดพลาด: ' + error.message, 'error');
+        return false;
+    }
+}
+
+// ===== DEBUG FUNCTIONS =====
+
+/**
+ * ตรวจสอบ Modal
  */
 function debugLocationsModal() {
     console.log('🔍 Debugging Locations Modal...');
     
-    // ตรวจสอบว่า Modal มีอยู่หรือไม่
     const modal = document.getElementById('manageLocationsModal');
     if (!modal) {
         console.error('❌ Modal "manageLocationsModal" not found!');
@@ -188,28 +487,24 @@ function debugLocationsModal() {
     }
     console.log('✅ Modal found:', modal);
     
-    // ตรวจสอบว่าฟังก์ชัน openModal มีอยู่หรือไม่
     if (typeof openModal !== 'function') {
         console.error('❌ Function "openModal" not defined!');
         return false;
     }
     console.log('✅ openModal function exists');
     
-    // ตรวจสอบว่าฟังก์ชัน openManageLocationsModal มีอยู่หรือไม่
     if (typeof openManageLocationsModal !== 'function') {
         console.error('❌ Function "openManageLocationsModal" not defined!');
         return false;
     }
     console.log('✅ openManageLocationsModal function exists');
     
-    // ตรวจสอบว่าฟังก์ชัน loadManageLocationsTable มีอยู่หรือไม่
     if (typeof loadManageLocationsTable !== 'function') {
         console.error('❌ Function "loadManageLocationsTable" not defined!');
         return false;
     }
     console.log('✅ loadManageLocationsTable function exists');
     
-    // ตรวจสอบว่า tbody มีอยู่หรือไม่
     const tbody = document.getElementById('manageLocationsTableBody');
     if (!tbody) {
         console.error('❌ Table body "manageLocationsTableBody" not found!');
@@ -222,71 +517,7 @@ function debugLocationsModal() {
 }
 
 /**
- * ===== ฟังก์ชันสำรองเปิด Modal =====
- * ใช้ในกรณีที่ฟังก์ชันเดิมไม่ทำงาน
- */
-function forceOpenManageLocationsModal() {
-    console.log('🔧 Force opening Manage Locations Modal...');
-    
-    // โหลดข้อมูลในตาราง
-    if (typeof loadManageLocationsTable === 'function') {
-        loadManageLocationsTable();
-    } else {
-        // ถ้าไม่มีฟังก์ชัน ให้สร้างเอง
-        const tbody = document.getElementById('manageLocationsTableBody');
-        if (tbody) {
-            const allLocations = typeof getAllLocations === 'function' 
-                ? getAllLocations() 
-                : [...new Set(assetsData.map(a => a.location).filter(Boolean))];
-            
-            const locationCounts = {};
-            assetsData.forEach(asset => {
-                const loc = asset.location || 'ไม่ระบุ';
-                locationCounts[loc] = (locationCounts[loc] || 0) + 1;
-            });
-            
-            tbody.innerHTML = allLocations.map(location => {
-                const count = locationCounts[location] || 0;
-                const capacity = locationCapacity[location] || '-';
-                const isCustom = customLocations && customLocations.some(l => l.name === location);
-                const canDelete = isCustom && count === 0;
-
-                return `
-                    <tr>
-                        <td>
-                            <strong>${location}</strong>
-                            ${isCustom ? '<span class="badge complete" style="margin-left: 10px; font-size: 10px;">กำหนดเอง</span>' : ''}
-                        </td>
-                        <td style="text-align: center; font-weight: 600;">${count}</td>
-                        <td style="text-align: center;">${capacity !== '-' ? capacity : '<span style="color: #999;">ไม่ระบุ</span>'}</td>
-                        <td style="text-align: center;">
-                            <button class="action-btn primary" onclick="editCapacity('${location}', ${count})" title="ตั้งค่าความจุ">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            ${canDelete ? `
-                                <button class="action-btn danger" onclick="deleteLocation('${location}')" title="ลบสถานที่">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            ` : ''}
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        }
-    }
-    
-    // เปิด Modal
-    const modal = document.getElementById('manageLocationsModal');
-    if (modal) {
-        modal.classList.add('active');
-        console.log('✅ Modal opened successfully!');
-    } else {
-        console.error('❌ Modal not found!');
-    }
-}
-
-/**
- * ===== ฟังก์ชันตรวจสอบและแสดงข้อมูล Debug =====
+ * ตรวจสอบข้อมูลสถานที่
  */
 function checkLocationsData() {
     console.log('=== Locations Data Debug ===');
@@ -294,7 +525,6 @@ function checkLocationsData() {
     console.log('📍 Custom Locations:', customLocations);
     console.log('📊 Location Capacity:', locationCapacity);
     
-    // นับทรัพย์สินในแต่ละสถานที่
     const locationCounts = {};
     assetsData.forEach(asset => {
         const loc = asset.location || 'ไม่ระบุ';
@@ -302,13 +532,11 @@ function checkLocationsData() {
     });
     console.log('📈 Asset Counts by Location:', locationCounts);
     
-    // สถานที่ทั้งหมด
     const allLocations = typeof getAllLocations === 'function' 
         ? getAllLocations() 
         : [...new Set(assetsData.map(a => a.location).filter(Boolean))];
     console.log('🗺️ All Locations:', allLocations);
     
-    // สถานที่ที่ไม่มีทรัพย์สิน
     const emptyLocations = allLocations.filter(loc => !locationCounts[loc] || locationCounts[loc] === 0);
     console.log('🏚️ Empty Locations:', emptyLocations);
     
@@ -319,14 +547,22 @@ function checkLocationsData() {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         updateLocationsPage,
+        openManageLocationsModal,
+        loadManageLocationsTable,
+        editCapacity,
+        deleteLocation,
+        openAddLocationModal,
+        saveNewLocation,
+        syncLocationsToSheets,
+        loadLocationsFromSheets,
         debugLocationsModal,
-        forceOpenManageLocationsModal,
         checkLocationsData
     };
 }
 
-console.log('✅ Locations Fix loaded successfully!');
+console.log('✅ Locations Manager loaded successfully!');
 console.log('💡 Tips:');
 console.log('  - Run debugLocationsModal() to check modal');
-console.log('  - Run forceOpenManageLocationsModal() to force open modal');
 console.log('  - Run checkLocationsData() to see locations data');
+console.log('  - Run syncLocationsToSheets() to save to Google Sheets');
+console.log('  - Run loadLocationsFromSheets() to load from Google Sheets');
