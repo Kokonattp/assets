@@ -2697,14 +2697,16 @@
                 <div class="form-grid">
                     <div class="form-group">
                         <label>โอนย้ายไปสถานที่ <span class="required">*</span></label>
-                        <input type="text" id="newLocation" list="locationList" placeholder="เลือกหรือพิมพ์สถานที่ใหม่" required>
-                        <datalist id="locationList"></datalist>
+                        <select id="newLocation" required style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 14px;">
+                            <option value="">-- เลือกสถานที่ --</option>
+                        </select>
                     </div>
 
                     <div class="form-group">
                         <label>โอนย้ายไปแผนก <span class="required">*</span></label>
-                        <input type="text" id="newDepartment" list="departmentList" placeholder="เลือกหรือพิมพ์แผนกใหม่" required>
-                        <datalist id="departmentList"></datalist>
+                        <select id="newDepartment" required style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 14px;">
+                            <option value="">-- เลือกแผนก --</option>
+                        </select>
                     </div>
                 </div>
 
@@ -3380,14 +3382,39 @@
             document.getElementById('currentLocation').textContent = asset.location || '-';
             document.getElementById('currentDepartment').textContent = asset.department || '-';
             
-            // ล้างฟอร์ม
-            document.getElementById('newLocation').value = '';
-            document.getElementById('newDepartment').value = '';
-            document.getElementById('transferReason').value = '';
-            document.getElementById('transferNote').value = '';
+            // ล้างฟอร์ม - รีเซ็ตเป็นค่าเริ่มต้น
+            const newLocationSelect = document.getElementById('newLocation');
+            const newDepartmentSelect = document.getElementById('newDepartment');
+            const transferReasonInput = document.getElementById('transferReason');
+            const transferNoteInput = document.getElementById('transferNote');
             
-            // สร้าง datalist สำหรับ locations และ departments
+            if (newLocationSelect) newLocationSelect.value = '';
+            if (newDepartmentSelect) newDepartmentSelect.value = '';
+            if (transferReasonInput) transferReasonInput.value = '';
+            if (transferNoteInput) transferNoteInput.value = '';
+            
+            // ล้าง border color
+            if (newLocationSelect) newLocationSelect.style.borderColor = '';
+            if (newDepartmentSelect) newDepartmentSelect.style.borderColor = '';
+            if (transferReasonInput) transferReasonInput.style.borderColor = '';
+            
+            // สร้าง dropdown options สำหรับ locations และ departments
             populateDatalist();
+            
+            // เพิ่ม event listener เพื่อ debug (สำหรับ select)
+            if (newLocationSelect) {
+                newLocationSelect.addEventListener('change', function() {
+                    console.log('📍 Location selected:', `"${this.value}"`, 'Length:', this.value.length);
+                });
+            }
+            
+            if (newDepartmentSelect) {
+                newDepartmentSelect.addEventListener('change', function() {
+                    console.log('🏢 Department selected:', `"${this.value}"`, 'Length:', this.value.length);
+                });
+            }
+            
+            console.log('✅ Transfer Modal opened for:', asset.code);
             
             openModal('transferModal');
         }
@@ -3395,29 +3422,110 @@
         function populateDatalist() {
             // Locations - ใช้ getAllLocations() เพื่อรวมทุกสถานที่
             const locations = getAllLocations();
-            const locationList = document.getElementById('locationList');
-            locationList.innerHTML = locations.map(loc => `<option value="${loc}">`).join('');
+            const locationSelect = document.getElementById('newLocation');
+            
+            // ล้างตัวเลือกเดิม (เก็บ option แรก)
+            locationSelect.innerHTML = '<option value="">-- เลือกสถานที่ --</option>';
+            
+            // เพิ่มตัวเลือกสถานที่
+            locations.forEach(loc => {
+                const option = document.createElement('option');
+                option.value = loc;
+                option.textContent = loc;
+                locationSelect.appendChild(option);
+            });
+            
+            console.log('📍 Loaded', locations.length, 'locations');
             
             // Departments - รวมจาก assets และ default departments
             const defaultDepartments = ['สำรอง', 'AC', 'AP', 'APB', 'CF', 'APL', 'CP', 'DP', 'INV', 'LS', 'QA', 'RC', 'ST'];
             const assetsDeparts = [...new Set(assetsData.map(a => a.department).filter(Boolean))];
             const allDepartments = [...new Set([...defaultDepartments, ...assetsDeparts])].sort();
             
-            const departmentList = document.getElementById('departmentList');
-            departmentList.innerHTML = allDepartments.map(dept => `<option value="${dept}">`).join('');
+            const departmentSelect = document.getElementById('newDepartment');
+            
+            // ล้างตัวเลือกเดิม (เก็บ option แรก)
+            departmentSelect.innerHTML = '<option value="">-- เลือกแผนก --</option>';
+            
+            // เพิ่มตัวเลือกแผนก
+            allDepartments.forEach(dept => {
+                const option = document.createElement('option');
+                option.value = dept;
+                option.textContent = dept;
+                departmentSelect.appendChild(option);
+            });
+            
+            console.log('🏢 Loaded', allDepartments.length, 'departments');
         }
 
         function confirmTransfer() {
             const index = parseInt(document.getElementById('transferAssetId').value);
-            const newLocation = document.getElementById('newLocation').value.trim();
-            const newDepartment = document.getElementById('newDepartment').value.trim();
-            const reason = document.getElementById('transferReason').value.trim();
-            const note = document.getElementById('transferNote').value.trim();
+            const newLocationElement = document.getElementById('newLocation');
+            const newDepartmentElement = document.getElementById('newDepartment');
+            const reasonElement = document.getElementById('transferReason');
             
-            if (!newLocation || !newDepartment || !reason) {
-                showNotification('⚠️ กรุณากรอกข้อมูลให้ครบถ้วน', 'warning');
+            // ตรวจสอบว่า element มีอยู่จริง
+            if (!newLocationElement || !newDepartmentElement || !reasonElement) {
+                console.error('Transfer form elements not found!');
+                showNotification('❌ เกิดข้อผิดพลาด: ไม่พบฟอร์มโอนย้าย', 'error');
                 return;
             }
+            
+            // แปลงค่าและ trim ช่องว่าง
+            const newLocation = (newLocationElement.value || '').trim();
+            const newDepartment = (newDepartmentElement.value || '').trim();
+            const reason = (reasonElement.value || '').trim();
+            const note = (document.getElementById('transferNote')?.value || '').trim();
+            
+            // Debug logging - แสดงข้อมูลทั้งหมดเพื่อ debug
+            console.log('🔍 Transfer Debug Info:', {
+                index: index,
+                newLocation: `"${newLocation}"`,
+                newDepartment: `"${newDepartment}"`,
+                reason: `"${reason}"`,
+                locationLength: newLocation.length,
+                departmentLength: newDepartment.length,
+                reasonLength: reason.length,
+                locationEmpty: !newLocation,
+                departmentEmpty: !newDepartment,
+                reasonEmpty: !reason
+            });
+            
+            // ตรวจสอบแต่ละฟิลด์อย่างละเอียด
+            if (!newLocation || newLocation.length === 0) {
+                console.warn('❌ Location validation failed');
+                showNotification('⚠️ กรุณาระบุสถานที่ใหม่', 'warning');
+                newLocationElement.focus();
+                newLocationElement.style.borderColor = '#ef4444';
+                setTimeout(() => {
+                    newLocationElement.style.borderColor = '';
+                }, 2000);
+                return;
+            }
+            
+            if (!newDepartment || newDepartment.length === 0) {
+                console.warn('❌ Department validation failed');
+                showNotification('⚠️ กรุณาระบุแผนกใหม่', 'warning');
+                newDepartmentElement.focus();
+                newDepartmentElement.style.borderColor = '#ef4444';
+                setTimeout(() => {
+                    newDepartmentElement.style.borderColor = '';
+                }, 2000);
+                return;
+            }
+            
+            if (!reason || reason.length === 0) {
+                console.warn('❌ Reason validation failed');
+                showNotification('⚠️ กรุณาระบุเหตุผลในการโอนย้าย', 'warning');
+                reasonElement.focus();
+                reasonElement.style.borderColor = '#ef4444';
+                setTimeout(() => {
+                    reasonElement.style.borderColor = '';
+                }, 2000);
+                return;
+            }
+            
+            console.log('✅ All validations passed!');
             
             const asset = assetsData[index];
             const oldLocation = asset.location;
