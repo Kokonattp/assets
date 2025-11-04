@@ -9,7 +9,32 @@
  */
 
 // ===== CONFIG =====
-const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbzx8IuqbW2GY8L0POxG1V5v8MOp3MTkz1fyHF1Wbh_nOomclgrK60vLQ-3-q9xKbkuNbA/exec'; // แก้ไข URL ของคุณที่นี่
+const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbwx56myaLhhyMKbzn9xyC_pRmn7a-hcWcmEESkM91AEuSWSN2uoRQMHol7WYaBjb9R_7A/exec'; // แก้ไข URL ของคุณที่นี่
+
+// ===== HELPER FUNCTIONS =====
+
+/**
+ * แปลงวันที่เป็นรูปแบบไทย
+ */
+function formatThaiDateTime(date) {
+    if (!date) return '';
+    
+    try {
+        const d = typeof date === 'string' ? new Date(date) : date;
+        
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear() + 543; // พ.ศ.
+        
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        const seconds = String(d.getSeconds()).padStart(2, '0');
+        
+        return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+    } catch (error) {
+        return date;
+    }
+}
 
 // ===== MAIN FUNCTIONS =====
 
@@ -383,7 +408,7 @@ async function syncLocationsToSheets() {
                 capacity,
                 assetCount,
                 isCustom ? 'Yes' : 'No',
-                new Date().toISOString()
+                formatThaiDateTime(new Date())
             ]);
         });
         
@@ -472,6 +497,93 @@ async function loadLocationsFromSheets() {
     }
 }
 
+/**
+ * บันทึกข้อมูลทรัพย์สินลง Google Sheets
+ */
+async function syncAssetsToSheets() {
+    try {
+        showNotification('⏳ กำลังบันทึกข้อมูลทรัพย์สินลง Google Sheets...', 'info');
+        
+        if (!assetsData || assetsData.length === 0) {
+            showNotification('⚠️ ไม่มีข้อมูลทรัพย์สินให้บันทึก', 'warning');
+            return false;
+        }
+        
+        const response = await fetch(SHEETS_API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'saveAssets',
+                data: assetsData
+            })
+        });
+        
+        showNotification('✅ บันทึกข้อมูลทรัพย์สินลง Google Sheets สำเร็จ!', 'success');
+        return true;
+        
+    } catch (error) {
+        console.error('Error saving assets to sheets:', error);
+        showNotification('❌ เกิดข้อผิดพลาด: ' + error.message, 'error');
+        return false;
+    }
+}
+
+/**
+ * โหลดข้อมูลทรัพย์สินจาก Google Sheets
+ */
+async function loadAssetsFromSheets() {
+    try {
+        showNotification('⏳ กำลังโหลดข้อมูลทรัพย์สินจาก Google Sheets...', 'info');
+        
+        const response = await fetch(SHEETS_API_URL + '?action=getAssets');
+        const result = await response.json();
+        
+        if (result.success && result.data && result.data.length > 1) {
+            // ข้าม header row
+            const assetsRows = result.data.slice(1);
+            
+            // แปลงข้อมูลจาก Sheet เป็น assetsData
+            assetsData = assetsRows.map(row => ({
+                code: row[0] || '',
+                name: row[1] || '',
+                category: row[2] || '',
+                location: row[3] || '',
+                quantity: parseInt(row[4]) || 1,
+                unit: row[5] || 'ชิ้น',
+                status: row[6] || 'สมบูรณ์',
+                purchaseDate: row[7] || '',
+                price: parseFloat(row[8]) || 0,
+                supplier: row[9] || '',
+                warranty: row[10] || '',
+                description: row[11] || '',
+                lastUpdated: row[12] || ''
+            }));
+            
+            // บันทึก localStorage
+            localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
+            
+            // อัพเดทหน้า
+            if (typeof updateDashboard === 'function') updateDashboard();
+            if (typeof updateAssetsPage === 'function') updateAssetsPage();
+            if (typeof updateLocationsPage === 'function') updateLocationsPage();
+            
+            showNotification(`✅ โหลดข้อมูลทรัพย์สิน ${assetsData.length} รายการจาก Google Sheets สำเร็จ!`, 'success');
+            return true;
+        }
+        
+        showNotification('⚠️ ไม่พบข้อมูลทรัพย์สินใน Google Sheets', 'warning');
+        return false;
+        
+    } catch (error) {
+        console.error('Error loading assets from sheets:', error);
+        showNotification('❌ เกิดข้อผิดพลาด: ' + error.message, 'error');
+        return false;
+    }
+}
+
 // ===== DEBUG FUNCTIONS =====
 
 /**
@@ -555,6 +667,8 @@ if (typeof module !== 'undefined' && module.exports) {
         saveNewLocation,
         syncLocationsToSheets,
         loadLocationsFromSheets,
+        syncAssetsToSheets,
+        loadAssetsFromSheets,
         debugLocationsModal,
         checkLocationsData
     };
@@ -564,5 +678,7 @@ console.log('✅ Locations Manager loaded successfully!');
 console.log('💡 Tips:');
 console.log('  - Run debugLocationsModal() to check modal');
 console.log('  - Run checkLocationsData() to see locations data');
-console.log('  - Run syncLocationsToSheets() to save to Google Sheets');
-console.log('  - Run loadLocationsFromSheets() to load from Google Sheets');
+console.log('  - Run syncLocationsToSheets() to save locations to Google Sheets');
+console.log('  - Run loadLocationsFromSheets() to load locations from Google Sheets');
+console.log('  - Run syncAssetsToSheets() to save assets to Google Sheets');
+console.log('  - Run loadAssetsFromSheets() to load assets from Google Sheets');
