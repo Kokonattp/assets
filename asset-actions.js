@@ -206,77 +206,68 @@ function editAsset(code) {
     
     console.log('📝 กำลังแก้ไขทรัพย์สิน:', asset);
     
-    // อัพเดท location และ department dropdowns
-    if (typeof updateLocationDropdowns === 'function') {
-        updateLocationDropdowns();
+    // 🔧 โหลด locations และ departments ลง dropdown
+    const locationSelect = document.getElementById('editLocation');
+    const departmentSelect = document.getElementById('editDepartment');
+    
+    if (locationSelect) {
+        // รวม locations จาก assetsData และ customLocations
+        const allLocations = new Set();
+        
+        // จาก assetsData
+        assetsData.forEach(a => {
+            if (a.location) allLocations.add(a.location);
+        });
+        
+        // จาก customLocations (ถ้ามี)
+        if (typeof customLocations !== 'undefined' && Array.isArray(customLocations)) {
+            customLocations.forEach(loc => allLocations.add(loc.name));
+        }
+        
+        // สร้าง options
+        const locations = Array.from(allLocations).sort((a, b) => a.localeCompare(b, 'th'));
+        locationSelect.innerHTML = '<option value="">-- เลือกสถานที่ --</option>' +
+            locations.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+        
+        // เลือกค่าปัจจุบัน
+        locationSelect.value = asset.location || '';
     }
     
-    // รอให้ dropdown พร้อมก่อนเติมข้อมูล
-    setTimeout(() => {
-        // เติมข้อมูลลงในฟอร์ม
-        document.getElementById('editAssetCode').value = asset.code;
-        document.getElementById('editCode').value = asset.code;
-        document.getElementById('editName').value = asset.name || '';
-        document.getElementById('editCategory').value = asset.category || '';
-        document.getElementById('editBrand').value = asset.brand || '';
-        document.getElementById('editModel').value = asset.model || '';
-        document.getElementById('editSerial').value = asset.serial || '';
-        document.getElementById('editPurchaseDate').value = asset.purchaseDate || '';
-        document.getElementById('editPrice').value = asset.price || 0;
-        document.getElementById('editQuantity').value = asset.quantity || 1;
-        
-        // 🔧 แก้ไข: ตั้งค่า location และ department
-        const locationSelect = document.getElementById('editLocation');
-        const departmentSelect = document.getElementById('editDepartment');
-        
-        // Location
-        if (asset.location && locationSelect) {
-            let locationFound = false;
-            for (let i = 0; i < locationSelect.options.length; i++) {
-                if (locationSelect.options[i].value === asset.location || 
-                    locationSelect.options[i].text === asset.location) {
-                    locationSelect.selectedIndex = i;
-                    locationFound = true;
-                    break;
-                }
-            }
-            
-            // ถ้าไม่เจอ ให้เพิ่ม option ใหม่
-            if (!locationFound) {
-                const newOption = new Option(asset.location, asset.location, true, true);
-                locationSelect.add(newOption);
-                console.log('➕ เพิ่ม location ใหม่:', asset.location);
-            }
-        }
-        
-        // Department
-        if (asset.department && departmentSelect) {
-            let departmentFound = false;
-            for (let i = 0; i < departmentSelect.options.length; i++) {
-                if (departmentSelect.options[i].value === asset.department || 
-                    departmentSelect.options[i].text === asset.department) {
-                    departmentSelect.selectedIndex = i;
-                    departmentFound = true;
-                    break;
-                }
-            }
-            
-            // ถ้าไม่เจอ ให้เพิ่ม option ใหม่
-            if (!departmentFound) {
-                const newOption = new Option(asset.department, asset.department, true, true);
-                departmentSelect.add(newOption);
-                console.log('➕ เพิ่ม department ใหม่:', asset.department);
-            }
-        }
-        
-        document.getElementById('editStatus').value = asset.status || 'สมบูรณ์';
-        document.getElementById('editDescription').value = asset.description || '';
-        
-        console.log('✅ เติมข้อมูลสำเร็จ:', {
-            location: locationSelect ? locationSelect.value : 'N/A',
-            department: departmentSelect ? departmentSelect.value : 'N/A'
+    if (departmentSelect) {
+        // รวม departments จาก assetsData
+        const allDepartments = new Set();
+        assetsData.forEach(a => {
+            if (a.department) allDepartments.add(a.department);
         });
-    }, 100);
+        
+        // สร้าง options
+        const departments = Array.from(allDepartments).sort((a, b) => a.localeCompare(b, 'th'));
+        departmentSelect.innerHTML = '<option value="">-- เลือกแผนก --</option>' +
+            departments.map(dept => `<option value="${dept}">${dept}</option>`).join('');
+        
+        // เลือกค่าปัจจุบัน
+        departmentSelect.value = asset.department || '';
+    }
+    
+    // เติมข้อมูลลงในฟอร์ม
+    document.getElementById('editAssetCode').value = asset.code;
+    document.getElementById('editCode').value = asset.code;
+    document.getElementById('editName').value = asset.name || '';
+    document.getElementById('editCategory').value = asset.category || '';
+    document.getElementById('editBrand').value = asset.brand || '';
+    document.getElementById('editModel').value = asset.model || '';
+    document.getElementById('editSerial').value = asset.serial || '';
+    document.getElementById('editPurchaseDate').value = asset.purchaseDate || '';
+    document.getElementById('editPrice').value = asset.price || 0;
+    document.getElementById('editQuantity').value = asset.quantity || 1;
+    
+    document.getElementById('editStatus').value = asset.status || 'สมบูรณ์';
+    document.getElementById('editDescription').value = asset.description || '';
+    
+    console.log('✅ เติมข้อมูลสำเร็จ:', {
+        location: locationSelect ? locationSelect.value : 'N/A',
+        department: departmentSelect ? departmentSelect.value : 'N/A'
+    });
     
     // แสดง Modal
     document.getElementById('editAssetModal').classList.add('active');
