@@ -9,7 +9,7 @@
  */
 
 // ===== CONFIG =====
-const SHEETS_API_URL = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec'; // แก้ไข URL ของคุณที่นี่
+const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbzx8IuqbW2GY8L0POxG1V5v8MOp3MTkz1fyHF1Wbh_nOomclgrK60vLQ-3-q9xKbkuNbA/exec'; // แก้ไข URL ของคุณที่นี่
 
 // ===== MAIN FUNCTIONS =====
 
