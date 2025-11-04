@@ -3420,42 +3420,93 @@
         }
 
         function populateDatalist() {
-            // Locations - ใช้ getAllLocations() เพื่อรวมทุกสถานที่
-            const locations = getAllLocations();
-            const locationSelect = document.getElementById('newLocation');
+            console.log('🔄 Populating dropdowns...');
             
-            // ล้างตัวเลือกเดิม (เก็บ option แรก)
-            locationSelect.innerHTML = '<option value="">-- เลือกสถานที่ --</option>';
+            try {
+                // Locations - ใช้ getAllLocations() เพื่อรวมทุกสถานที่
+                let locations = [];
+                
+                // ลอง getAllLocations() ถ้ามี
+                if (typeof getAllLocations === 'function') {
+                    try {
+                        locations = getAllLocations();
+                        console.log('✅ getAllLocations() returned:', locations.length, 'locations');
+                    } catch (error) {
+                        console.error('❌ getAllLocations() error:', error);
+                    }
+                }
+                
+                // ถ้าไม่มี locations ให้ใช้ default + จาก assets
+                if (!locations || locations.length === 0) {
+                    console.warn('⚠️ No locations from getAllLocations(), using fallback');
+                    const defaultLocations = [
+                        'คลังเก็บสินค้า',
+                        'คลังบก',
+                        'คลังสินค้าหลัก - โซน A',
+                        'คลังสินค้าหลัก - โซน B',
+                        'คลังสินค้าหลัก - โซน C',
+                        'คลังสินค้ารอง',
+                        'คลังสินค้าสำรองDC1',
+                        'ศูนย์กระจายสินค้า'
+                    ];
+                    const locationsFromAssets = [...new Set(assetsData.map(a => a.location).filter(Boolean))];
+                    locations = [...new Set([...defaultLocations, ...locationsFromAssets])].sort();
+                    console.log('✅ Fallback locations:', locations.length);
+                }
+                
+                const locationSelect = document.getElementById('newLocation');
+                
+                if (!locationSelect) {
+                    console.error('❌ Element "newLocation" not found!');
+                    return;
+                }
+                
+                // ล้างตัวเลือกเดิม (เก็บ option แรก)
+                locationSelect.innerHTML = '<option value="">-- เลือกสถานที่ --</option>';
+                
+                // เพิ่มตัวเลือกสถานที่
+                locations.forEach(loc => {
+                    const option = document.createElement('option');
+                    option.value = loc;
+                    option.textContent = loc;
+                    locationSelect.appendChild(option);
+                });
+                
+                console.log('📍 Loaded', locations.length, 'locations into dropdown');
+                
+            } catch (error) {
+                console.error('❌ Error in location population:', error);
+            }
             
-            // เพิ่มตัวเลือกสถานที่
-            locations.forEach(loc => {
-                const option = document.createElement('option');
-                option.value = loc;
-                option.textContent = loc;
-                locationSelect.appendChild(option);
-            });
-            
-            console.log('📍 Loaded', locations.length, 'locations');
-            
-            // Departments - รวมจาก assets และ default departments
-            const defaultDepartments = ['สำรอง', 'AC', 'AP', 'APB', 'CF', 'APL', 'CP', 'DP', 'INV', 'LS', 'QA', 'RC', 'ST'];
-            const assetsDeparts = [...new Set(assetsData.map(a => a.department).filter(Boolean))];
-            const allDepartments = [...new Set([...defaultDepartments, ...assetsDeparts])].sort();
-            
-            const departmentSelect = document.getElementById('newDepartment');
-            
-            // ล้างตัวเลือกเดิม (เก็บ option แรก)
-            departmentSelect.innerHTML = '<option value="">-- เลือกแผนก --</option>';
-            
-            // เพิ่มตัวเลือกแผนก
-            allDepartments.forEach(dept => {
-                const option = document.createElement('option');
-                option.value = dept;
-                option.textContent = dept;
-                departmentSelect.appendChild(option);
-            });
-            
-            console.log('🏢 Loaded', allDepartments.length, 'departments');
+            try {
+                // Departments - รวมจาก assets และ default departments
+                const defaultDepartments = ['สำรอง', 'AC', 'AP', 'APB', 'APGM', 'CF', 'APL', 'CP', 'DP', 'INV', 'LS', 'QA', 'RC', 'ST'];
+                const assetsDeparts = [...new Set(assetsData.map(a => a.department).filter(Boolean))];
+                const allDepartments = [...new Set([...defaultDepartments, ...assetsDeparts])].sort();
+                
+                const departmentSelect = document.getElementById('newDepartment');
+                
+                if (!departmentSelect) {
+                    console.error('❌ Element "newDepartment" not found!');
+                    return;
+                }
+                
+                // ล้างตัวเลือกเดิม (เก็บ option แรก)
+                departmentSelect.innerHTML = '<option value="">-- เลือกแผนก --</option>';
+                
+                // เพิ่มตัวเลือกแผนก
+                allDepartments.forEach(dept => {
+                    const option = document.createElement('option');
+                    option.value = dept;
+                    option.textContent = dept;
+                    departmentSelect.appendChild(option);
+                });
+                
+                console.log('🏢 Loaded', allDepartments.length, 'departments into dropdown');
+                
+            } catch (error) {
+                console.error('❌ Error in department population:', error);
+            }
         }
 
         function confirmTransfer() {
@@ -4510,6 +4561,7 @@
         function getAllLocations() {
             const defaultLocations = [
                 'คลังเก็บสินค้า',
+                'คลังบก',
                 'คลังสินค้าหลัก - โซน A',
                 'คลังสินค้าหลัก - โซน B',
                 'คลังสินค้าหลัก - โซน C',
@@ -4520,13 +4572,20 @@
             // เพิ่มสถานที่จากทรัพย์สินที่มีอยู่
             const locationsFromAssets = [...new Set(assetsData.map(a => a.location).filter(Boolean))];
             
-            // รวมกับ custom locations
-            const customLocs = customLocations.map(l => l.name);
+            // รวมกับ custom locations (ถ้ามี)
+            let customLocs = [];
+            try {
+                if (typeof customLocations !== 'undefined' && Array.isArray(customLocations)) {
+                    customLocs = customLocations.map(l => l.name || l).filter(Boolean);
+                }
+            } catch (error) {
+                console.warn('⚠️ customLocations error:', error);
+            }
             
             // รวมทั้งหมดและเอาที่ซ้ำออก
             const allLocations = [...new Set([...defaultLocations, ...locationsFromAssets, ...customLocs])];
             
-            return allLocations.sort(); // เรียงตามตัวอักษร
+            return allLocations.sort((a, b) => a.localeCompare(b, 'th')); // เรียงตามตัวอักษรภาษาไทย
         }
 
         // Update location dropdowns
