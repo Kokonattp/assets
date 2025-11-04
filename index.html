@@ -13,6 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="transfer-modal-fix.js"></script>
+    <script src="locations-sheets-sync.js"></script>
     <style>
         * {
             margin: 0;
@@ -1505,6 +1506,14 @@
                         <i class="fas fa-cog"></i>
                         จัดการสถานที่
                     </button>
+                    <button class="btn btn-info" onclick="syncLocationsToSheets()" title="บันทึกข้อมูลสถานที่ลง Google Sheets">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        บันทึกลง Sheets
+                    </button>
+                    <button class="btn btn-warning" onclick="loadLocationsFromSheets()" title="โหลดข้อมูลสถานที่จาก Google Sheets">
+                        <i class="fas fa-cloud-download-alt"></i>
+                        โหลดจาก Sheets
+                    </button>
                 </div>
             </div>
 
@@ -2869,6 +2878,13 @@
             }
             if (pageId === 'locations') {
                 updateLocationsPage();
+                
+                // 🆕 Auto-load จาก Sheets ถ้ามีการเชื่อมต่อ
+                if (sheetsConfig && sheetsConfig.spreadsheetId) {
+                    loadLocationsFromSheets().catch(err => {
+                        console.warn('Could not load locations from Sheets:', err);
+                    });
+                }
             }
             if (pageId === 'maintenance') {
                 updateMaintenancePage();
@@ -4529,7 +4545,7 @@
             openModal('capacityModal');
         }
 
-        function saveCapacity() {
+        async function saveCapacity() {
             const locationName = document.getElementById('capacityLocationName').value;
             const maxValue = parseInt(document.getElementById('capacityMaxValue').value);
             
@@ -4540,6 +4556,11 @@
             
             locationCapacity[locationName] = maxValue;
             localStorage.setItem('fmcgLocationCapacity', JSON.stringify(locationCapacity));
+            
+            // 🆕 Sync กับ Google Sheets
+            if (typeof syncLocationsToSheets === 'function') {
+                await syncLocationsToSheets();
+            }
             
             closeModal('capacityModal');
             updateLocationsPage();
@@ -4630,7 +4651,7 @@
         }
 
         // Save New Location
-        function saveNewLocation() {
+        async function saveNewLocation() {
             const name = document.getElementById('newLocationName').value.trim();
             const capacity = document.getElementById('newLocationCapacity').value;
             const description = document.getElementById('newLocationDescription').value.trim();
@@ -4662,6 +4683,11 @@
             if (capacity && parseInt(capacity) > 0) {
                 locationCapacity[name] = parseInt(capacity);
                 localStorage.setItem('fmcgLocationCapacity', JSON.stringify(locationCapacity));
+            }
+
+            // 🆕 Sync กับ Google Sheets
+            if (typeof syncLocationsToSheets === 'function') {
+                await syncLocationsToSheets();
             }
 
             closeModal('addLocationModal');
@@ -4718,7 +4744,7 @@
         }
 
         // Delete Location
-        function deleteLocation(locationName) {
+        async function deleteLocation(locationName) {
             const confirmed = confirm(`คุณต้องการลบสถานที่ "${locationName}" ใช่หรือไม่?`);
             if (!confirmed) return;
 
@@ -4730,6 +4756,11 @@
             if (locationCapacity[locationName]) {
                 delete locationCapacity[locationName];
                 localStorage.setItem('fmcgLocationCapacity', JSON.stringify(locationCapacity));
+            }
+
+            // 🆕 Sync กับ Google Sheets
+            if (typeof syncLocationsToSheets === 'function') {
+                await syncLocationsToSheets();
             }
 
             loadManageLocationsTable();
@@ -6108,6 +6139,13 @@
                 
                 updateSheetsStatus(true);
                 showNotification('✅ เชื่อมต่อ Google Apps Script สำเร็จ!', 'success');
+                
+                // 🆕 Initialize Locations Sync
+                if (typeof initializeLocationsSync === 'function') {
+                    initializeLocationsSync().catch(err => {
+                        console.warn('Could not initialize locations sync:', err);
+                    });
+                }
                 
             } catch (error) {
                 hideLoading();
