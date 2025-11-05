@@ -9,7 +9,7 @@
  */
 
 // ===== CONFIG =====
-const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbyTvUCnoVM6pzBT6zT2GrgZaYukAPva1eM8H_LuxPtTK_HgovEjQaOasolo8ojHLtavNA/exec'; // แก้ไข URL ของคุณที่นี่
+const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbz7pRtL4e6rKVber5-b59tNUoNIkmN4YsBkhIC7ZQkPmT9HAGeZBlu2MIpQvKvFxtByQg/exec'; // แก้ไข URL ของคุณที่นี่
 
 // ===== HELPER FUNCTIONS =====
 
@@ -552,8 +552,6 @@ async function loadLocationsFromSheets(silent = false) {
             showNotification('❌ เกิดข้อผิดพลาด: ' + error.message, 'error');
         }
         return false;
-    }
-}
     }
 }
 
