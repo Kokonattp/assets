@@ -9,7 +9,8 @@
  */
 
 // ===== CONFIG =====
-const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbz7pRtL4e6rKVber5-b59tNUoNIkmN4YsBkhIC7ZQkPmT9HAGeZBlu2MIpQvKvFxtByQg/exec'; // แก้ไข URL ของคุณที่นี่
+// ⚡ ใช้ syncManager จาก index.html แทน (ไม่ต้องตั้งค่า URL แยก)
+// syncManager จะถูกสร้างอัตโนมัติใน index.html
 
 // ===== HELPER FUNCTIONS =====
 
