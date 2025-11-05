@@ -9,7 +9,7 @@
  */
 
 // ===== CONFIG =====
-const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbwx56myaLhhyMKbzn9xyC_pRmn7a-hcWcmEESkM91AEuSWSN2uoRQMHol7WYaBjb9R_7A/exec'; // แก้ไข URL ของคุณที่นี่
+const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbyTvUCnoVM6pzBT6zT2GrgZaYukAPva1eM8H_LuxPtTK_HgovEjQaOasolo8ojHLtavNA/exec'; // แก้ไข URL ของคุณที่นี่
 
 // ===== HELPER FUNCTIONS =====
 
