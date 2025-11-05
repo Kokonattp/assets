@@ -3230,7 +3230,6 @@
             try {
                 // Save to local storage
                 assetsData.push(asset);
-                localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
                 
                 // 📝 บันทึกประวัติการสร้างทรัพย์สินใหม่
                 if (typeof logAssetCreation === 'function') {
@@ -3268,7 +3267,6 @@
             }
             
             assetsData = assetsData.filter(a => a.code !== code);
-            localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
             
             showNotification('✅ ลบทรัพย์สินสำเร็จ!', 'success');
             renderAssetsTable();
@@ -3377,8 +3375,6 @@
         // ========================================
         // 🔄 Transfer Functions
         // ========================================
-        let transferHistory = JSON.parse(localStorage.getItem('fmcgTransferHistory') || '[]');
-
         function showTransferModal(index) {
             const asset = assetsData[index];
             
@@ -3602,7 +3598,6 @@
             };
             
             transferHistory.unshift(transfer);
-            localStorage.setItem('fmcgTransferHistory', JSON.stringify(transferHistory));
             
             // 📝 บันทึกประวัติการโอนย้ายในระบบ History Tracking
             if (typeof logAssetTransfer === 'function') {
@@ -3612,7 +3607,6 @@
             // อัปเดตข้อมูลทรัพย์สิน
             assetsData[index].location = newLocation;
             assetsData[index].department = newDepartment;
-            localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
             
             closeModal('transferModal');
             showNotification('✅ โอนย้ายทรัพย์สินสำเร็จ!', 'success');
@@ -3697,7 +3691,6 @@
                         addedCount++;
                     });
                     
-                    localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
                     
                     hideLoading();
                     hideImportSection();
@@ -3902,7 +3895,6 @@
                 
                 // Add to local storage
                 assetsData = [...assetsData, ...processedData];
-                localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
                 
                 // Save to Google Sheets if configured
                 if (sheetsConfig.webAppUrl) {
@@ -4358,8 +4350,6 @@
         // 📍 Location & Capacity Management
         // ========================================
         
-        let locationCapacity = JSON.parse(localStorage.getItem('fmcgLocationCapacity') || '{}');
-
         function updateLocationsPage() {
             if (assetsData.length === 0) {
                 const tbody = document.getElementById('locationsTableBody');
@@ -4543,7 +4533,6 @@
             }
             
             locationCapacity[locationName] = maxValue;
-            localStorage.setItem('fmcgLocationCapacity', JSON.stringify(locationCapacity));
             
             // 🆕 Sync กับ Google Sheets
             if (typeof syncLocationsToSheets === 'function') {
@@ -4561,10 +4550,8 @@
 
         // Load custom locations
         function loadCustomLocations() {
-            const saved = localStorage.getItem('fmcgCustomLocations');
-            if (saved) {
-                customLocations = JSON.parse(saved);
-            }
+            // โหลดจาก Google Sheets
+            // ฟังก์ชันนี้จะถูกเรียกเมื่อโหลดหน้า
         }
 
         // Get all locations (default + custom)
@@ -4665,12 +4652,10 @@
             };
 
             customLocations.push(newLocation);
-            localStorage.setItem('fmcgCustomLocations', JSON.stringify(customLocations));
 
             // ถ้ามีความจุ ให้บันทึกด้วย
             if (capacity && parseInt(capacity) > 0) {
                 locationCapacity[name] = parseInt(capacity);
-                localStorage.setItem('fmcgLocationCapacity', JSON.stringify(locationCapacity));
             }
 
             // 🆕 Sync กับ Google Sheets
@@ -4738,12 +4723,10 @@
 
             // ลบจาก customLocations
             customLocations = customLocations.filter(l => l.name !== locationName);
-            localStorage.setItem('fmcgCustomLocations', JSON.stringify(customLocations));
 
             // ลบ capacity ถ้ามี
             if (locationCapacity[locationName]) {
                 delete locationCapacity[locationName];
-                localStorage.setItem('fmcgLocationCapacity', JSON.stringify(locationCapacity));
             }
 
             // 🆕 Sync กับ Google Sheets
@@ -5941,7 +5924,6 @@
                 })).filter(asset => asset.code && asset.name);
                 
                 assetsData = loadedAssets;
-                localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
                 
                 hideLoading();
                 showNotification(`✅ โหลดข้อมูล ${loadedAssets.length} รายการสำเร็จ! (Apps Script)`, 'success');
@@ -5991,7 +5973,6 @@
             })).filter(asset => asset.code && asset.name);
             
             assetsData = loadedAssets;
-            localStorage.setItem('fmcgAssets', JSON.stringify(assetsData));
             
             hideLoading();
             showNotification(`⚡ โหลดข้อมูล ${loadedAssets.length} รายการสำเร็จ! (Sheets API - เร็ว)`, 'success');
@@ -6107,7 +6088,6 @@
                 const data = await response.json();
                 
                 sheetsConfig = { webAppUrl, sheetName: 'Assets' };
-                localStorage.setItem('fmcgSheetsConfig', JSON.stringify(sheetsConfig));
                 
                 hideLoading();
                 
@@ -6187,8 +6167,6 @@
             }
             
             sheetsConfig = { webAppUrl, sheetName: 'Assets' };
-            localStorage.setItem('fmcgSheetsConfig', JSON.stringify(sheetsConfig));
-            localStorage.setItem('fmcgCompanyName', companyName);
             
             showNotification('✅ บันทึกการตั้งค่าสำเร็จ!', 'success');
         }
@@ -6575,8 +6553,6 @@
             }));
 
             // บันทึกลง localStorage
-            localStorage.setItem('fmcgStockCount', JSON.stringify(stockCountData));
-            localStorage.setItem('fmcgStockSession', JSON.stringify(currentStockSession));
 
             hideLoading();
             updateStockCountPage();
@@ -6586,8 +6562,6 @@
         // Update Stock Count Page
         function updateStockCountPage() {
             // โหลดข้อมูลจาก localStorage
-            const savedStock = localStorage.getItem('fmcgStockCount');
-            const savedSession = localStorage.getItem('fmcgStockSession');
             
             if (savedStock) {
                 stockCountData = JSON.parse(savedStock);
@@ -6755,7 +6729,6 @@
                 item.countedBy = 'Admin';
 
                 // บันทึกลง localStorage
-                localStorage.setItem('fmcgStockCount', JSON.stringify(stockCountData));
 
                 closeModal('stockCountModal');
                 updateStockCountPage();
@@ -6865,30 +6838,23 @@
         }
 
         // Initialize on load
-        window.addEventListener('load', function() {
-            // Load data from localStorage
-            const savedAssets = localStorage.getItem('fmcgAssets');
-            if (savedAssets) {
-                assetsData = JSON.parse(savedAssets);
+        window.addEventListener('load', async function() {
+            console.log('🚀 กำลังเริ่มต้นระบบ...');
+            
+            // 🔄 โหลดข้อมูลจาก Google Sheets ทันที
+            try {
+                await loadFromGoogleSheets();
+                console.log('✅ โหลดข้อมูลสำเร็จ');
+            } catch (error) {
+                console.error('❌ ไม่สามารถโหลดข้อมูลได้:', error);
+                showNotification('⚠️ ไม่สามารถโหลดข้อมูลจาก Google Sheets', 'warning');
             }
             
-            const savedConfig = localStorage.getItem('fmcgSheetsConfig');
-            if (savedConfig) {
-                sheetsConfig = JSON.parse(savedConfig);
-                document.getElementById('webAppUrl').value = sheetsConfig.webAppUrl;
+            // โหลดการตั้งค่า Web App URL (ถ้ามี)
+            const urlInput = document.getElementById('webAppUrl');
+            if (urlInput && GOOGLE_APPS_SCRIPT_URL) {
+                urlInput.value = GOOGLE_APPS_SCRIPT_URL;
                 updateSheetsStatus(true);
-            } else {
-                // ⭐ ถ้าไม่มี localStorage ให้ใช้ค่า default
-                document.getElementById('webAppUrl').value = GOOGLE_APPS_SCRIPT_URL;
-                // อัปเดตสถานะว่าเชื่อมต่อแล้ว (เพราะมี URL default)
-                if (GOOGLE_APPS_SCRIPT_URL) {
-                    updateSheetsStatus(true);
-                }
-            }
-            
-            const savedCompany = localStorage.getItem('fmcgCompanyName');
-            if (savedCompany) {
-                document.getElementById('companyName').value = savedCompany;
             }
             
             // Load custom locations
@@ -6917,6 +6883,153 @@
                 }
             });
         };
+    
+        /**
+         * 🔄 บันทึกประวัติการย้ายไปที่ Google Sheets
+         */
+        async function saveTransferHistory(transfer) {
+            const webAppUrl = sheetsConfig.webAppUrl || GOOGLE_APPS_SCRIPT_URL;
+            
+            if (!webAppUrl) {
+                throw new Error('กรุณาตั้งค่า Web App URL');
+            }
+            
+            try {
+                const response = await fetch(webAppUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'saveTransferHistory',
+                        data: transfer
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('ไม่สามารถบันทึกประวัติได้');
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('Error saving transfer history:', error);
+                throw error;
+            }
+        }
+
+        /**
+         * 🔄 บันทึกข้อมูลสถานที่ไปที่ Google Sheets
+         */
+        async function saveLocationToSheets(location, capacity, customData = null) {
+            const webAppUrl = sheetsConfig.webAppUrl || GOOGLE_APPS_SCRIPT_URL;
+            
+            if (!webAppUrl) {
+                throw new Error('กรุณาตั้งค่า Web App URL');
+            }
+            
+            try {
+                const response = await fetch(webAppUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'saveLocation',
+                        location: location,
+                        capacity: capacity,
+                        custom: customData
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('ไม่สามารถบันทึกสถานที่ได้');
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('Error saving location:', error);
+                throw error;
+            }
+        }
+
+        /**
+         * 🔄 โหลดข้อมูลสถานที่จาก Google Sheets
+         */
+        async function loadLocationsFromSheets() {
+            const webAppUrl = sheetsConfig.webAppUrl || GOOGLE_APPS_SCRIPT_URL;
+            
+            if (!webAppUrl) {
+                throw new Error('กรุณาตั้งค่า Web App URL');
+            }
+            
+            try {
+                const response = await fetch(webAppUrl + '?action=getLocations');
+                
+                if (!response.ok) {
+                    throw new Error('ไม่สามารถโหลดข้อมูลสถานที่ได้');
+                }
+                
+                const result = await response.json();
+                return result.data || [];
+            } catch (error) {
+                console.error('Error loading locations:', error);
+                throw error;
+            }
+        }
+
+        /**
+         * 🔄 บันทึกข้อมูลนับสตอคไปที่ Google Sheets
+         */
+        async function saveStockCountToSheets(stockData, session) {
+            const webAppUrl = sheetsConfig.webAppUrl || GOOGLE_APPS_SCRIPT_URL;
+            
+            if (!webAppUrl) {
+                throw new Error('กรุณาตั้งค่า Web App URL');
+            }
+            
+            try {
+                const response = await fetch(webAppUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'saveStockCount',
+                        data: stockData,
+                        session: session
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('ไม่สามารถบันทึกข้อมูลนับสตอคได้');
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('Error saving stock count:', error);
+                throw error;
+            }
+        }
+
+        /**
+         * 🔄 โหลดข้อมูลนับสตอคจาก Google Sheets
+         */
+        async function loadStockCountFromSheets() {
+            const webAppUrl = sheetsConfig.webAppUrl || GOOGLE_APPS_SCRIPT_URL;
+            
+            if (!webAppUrl) {
+                throw new Error('กรุณาตั้งค่า Web App URL');
+            }
+            
+            try {
+                const response = await fetch(webAppUrl + '?action=getStockCount');
+                
+                if (!response.ok) {
+                    throw new Error('ไม่สามารถโหลดข้อมูลนับสตอคได้');
+                }
+                
+                const result = await response.json();
+                return {
+                    data: result.data || [],
+                    session: result.session || null
+                };
+            } catch (error) {
+                console.error('Error loading stock count:', error);
+                throw error;
+            }
+        }
+
     </script>
 
     <!-- ============================================ -->
