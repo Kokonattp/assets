@@ -233,8 +233,12 @@ function saveFromScanner(code) {
         item.countedDate = new Date().toISOString();
         item.countedBy = 'Mobile Scanner';
         
-        // บันทึกลง localStorage
-        localStorage.setItem('fmcgStockCount', JSON.stringify(stockCountData));
+        // 🔄 บันทึกไปที่ Google Sheets โดยตรง
+        if (typeof saveStockCountToSheets === 'function') {
+            saveStockCountToSheets(stockCountData, currentStockSession).catch(error => {
+                console.error('Error saving stock count:', error);
+            });
+        }
         
         // แสดง notification
         showNotification(`✅ บันทึกสำเร็จ!\n📦 ${item.name}\n📊 ระบบ: ${item.systemQty} | นับได้: ${quantity}`, 'success');
