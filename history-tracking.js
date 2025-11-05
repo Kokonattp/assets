@@ -270,18 +270,6 @@ async function syncHistoryToSheets(historyEntries) {
         return false;
     }
 }
-        });
-        
-        if (!response.ok) {
-            throw new Error('Failed to sync history to Sheets');
-        }
-        
-        console.log(`Synced ${historyEntries.length} history entries to Google Sheets`);
-        
-    } catch (error) {
-        console.error('Error syncing history to Sheets:', error);
-    }
-}
 
 /**
  * สร้าง Sheet สำหรับประวัติ
