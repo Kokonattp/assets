@@ -9,7 +9,7 @@
  */
 
 // ===== CONFIG =====
-const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbyTvUCnoVM6pzBT6zT2GrgZaYukAPva1eM8H_LuxPtTK_HgovEjQaOasolo8ojHLtavNA/exec'; // แก้ไข URL ของคุณที่นี่
+const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbwx56myaLhhyMKbzn9xyC_pRmn7a-hcWcmEESkM91AEuSWSN2uoRQMHol7WYaBjb9R_7A/exec'; // แก้ไข URL ของคุณที่นี่
 
 // ===== HELPER FUNCTIONS =====
 
@@ -423,23 +423,55 @@ async function syncLocationsToSheets() {
             ]);
         });
         
-        const response = await fetch(SHEETS_API_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                action: 'saveLocations',
-                data: rows
-            })
-        });
+        console.log('📊 บันทึกข้อมูล:', rows.length, 'สถานที่');
+        console.log('📍 ข้อมูล:', rows);
         
-        showNotification('✅ บันทึกข้อมูลลง Google Sheets สำเร็จ!', 'success');
-        return true;
+        // ลองใช้ fetch แบบธรรมดาก่อน (ไม่ใช้ no-cors)
+        try {
+            const response = await fetch(SHEETS_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'saveLocations',
+                    data: rows
+                })
+            });
+            
+            const result = await response.json();
+            console.log('✅ ผลลัพธ์จาก Google Sheets:', result);
+            
+            if (result.success) {
+                showNotification('✅ บันทึกข้อมูลลง Google Sheets สำเร็จ!', 'success');
+                return true;
+            } else {
+                showNotification('⚠️ บันทึกไม่สำเร็จ: ' + (result.error || 'Unknown error'), 'warning');
+                return false;
+            }
+        } catch (fetchError) {
+            // ถ้า CORS error ให้ลองใช้ no-cors mode
+            console.log('⚠️ CORS error, ลองใช้ no-cors mode');
+            
+            await fetch(SHEETS_API_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'saveLocations',
+                    data: rows
+                })
+            });
+            
+            console.log('✅ ส่งข้อมูลไปยัง Google Sheets แล้ว (no-cors mode)');
+            showNotification('✅ ส่งข้อมูลไปยัง Google Sheets แล้ว (กรุณาตรวจสอบใน Sheet)', 'success');
+            return true;
+        }
         
     } catch (error) {
-        console.error('Error saving to sheets:', error);
+        console.error('❌ Error saving to sheets:', error);
         showNotification('❌ เกิดข้อผิดพลาด: ' + error.message, 'error');
         return false;
     }
