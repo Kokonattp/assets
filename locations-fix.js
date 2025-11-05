@@ -40,8 +40,14 @@ function formatThaiDateTime(date) {
 
 /**
  * อัพเดทหน้า Locations Page
+ * โหลดข้อมูลจาก Google Sheets อัตโนมัติ
  */
-function updateLocationsPage() {
+async function updateLocationsPage() {
+    // โหลดข้อมูลจาก Google Sheets อัตโนมัติแบบ silent
+    if (typeof loadLocationsFromSheets === 'function') {
+        await loadLocationsFromSheets(true); // silent mode
+    }
+    
     if (assetsData.length === 0) {
         const tbody = document.getElementById('locationsTableBody');
         if (tbody) {
@@ -336,8 +342,9 @@ function openAddLocationModal() {
 
 /**
  * บันทึกสถานที่ใหม่
+ * บันทึกลง Google Sheets ทันที
  */
-function saveNewLocation() {
+async function saveNewLocation() {
     const nameInput = document.getElementById('newLocationName');
     const capacityInput = document.getElementById('newLocationCapacity');
     
@@ -378,9 +385,13 @@ function saveNewLocation() {
     }
     
     closeModal('addLocationModal');
+    
+    // บันทึกลง Google Sheets ทันที
+    await syncLocationsToSheets();
+    
     updateLocationsPage();
     
-    showNotification(`✅ เพิ่มสถานที่ "${name}" สำเร็จ!`, 'success');
+    showNotification(`✅ เพิ่มสถานที่ "${name}" และบันทึกลง Sheets สำเร็จ!`, 'success');
 }
 
 // ===== GOOGLE SHEETS SYNC =====
@@ -436,15 +447,18 @@ async function syncLocationsToSheets() {
 
 /**
  * โหลดข้อมูลสถานที่จาก Google Sheets
+ * @param {boolean} silent - ถ้าเป็น true จะไม่แสดง notification
  */
-async function loadLocationsFromSheets() {
+async function loadLocationsFromSheets(silent = false) {
     try {
-        showNotification('⏳ กำลังโหลดข้อมูลจาก Google Sheets...', 'info');
+        if (!silent) {
+            showNotification('⏳ กำลังโหลดข้อมูลจาก Google Sheets...', 'info');
+        }
         
         const response = await fetch(SHEETS_API_URL + '?action=getLocations');
         const result = await response.json();
         
-        if (result.success && result.data) {
+        if (result.success && result.data && result.data.length > 1) {
             // ข้าม header row
             const locationsData = result.data.slice(1);
             
@@ -477,23 +491,31 @@ async function loadLocationsFromSheets() {
             localStorage.setItem('fmcgLocationCapacity', JSON.stringify(locationCapacity));
             localStorage.setItem('fmcgCustomLocations', JSON.stringify(customLocations));
             
-            // อัพเดทหน้า
-            updateLocationsPage();
-            if (document.getElementById('manageLocationsModal').classList.contains('active')) {
+            // อัพเดทหน้า (แต่อย่าเรียก updateLocationsPage() ซ้ำซ้อน)
+            if (document.getElementById('manageLocationsModal') && 
+                document.getElementById('manageLocationsModal').classList.contains('active')) {
                 loadManageLocationsTable();
             }
             
-            showNotification('✅ โหลดข้อมูลจาก Google Sheets สำเร็จ!', 'success');
+            if (!silent) {
+                showNotification('✅ โหลดข้อมูลจาก Google Sheets สำเร็จ!', 'success');
+            }
             return true;
         }
         
-        showNotification('⚠️ ไม่พบข้อมูลสถานที่ใน Google Sheets', 'warning');
+        if (!silent) {
+            console.log('ไม่พบข้อมูลสถานที่ใน Google Sheets หรือยังไม่มี header');
+        }
         return false;
         
     } catch (error) {
         console.error('Error loading from sheets:', error);
-        showNotification('❌ เกิดข้อผิดพลาด: ' + error.message, 'error');
+        if (!silent) {
+            showNotification('❌ เกิดข้อผิดพลาด: ' + error.message, 'error');
+        }
         return false;
+    }
+}
     }
 }
 
