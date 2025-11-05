@@ -12,8 +12,1008 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="transfer-modal-fix.js"></script>
-    <script src="locations-fix.js"></script>
+    <!-- ⚡ NEW: Sheets API + Apps Script Integration (Inline) -->
+    <script>
+
+// ==================== Sheets API Handler ====================
+/**
+ * FMCG Asset Management - Sheets API Handler
+ * จัดการการอ่านข้อมูลจาก Google Sheets ด้วย Sheets API (เร็วกว่า Apps Script)
+ * Version: 4.0
+ * วันที่: 5 พฤศจิกายน 2568
+ */
+
+class SheetsAPIHandler {
+    constructor(apiKey, spreadsheetId) {
+        this.apiKey = apiKey;
+        this.spreadsheetId = spreadsheetId;
+        this.baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
+        
+        // กำหนดชื่อชีทที่ต้องการ
+        this.sheetNames = {
+            assets: 'Assets',
+            locations: 'Locations',
+            stockCount: 'StockCount',
+            transferHistory: 'TransferHistory'
+        };
+    }
+
+    /**
+     * สร้าง URL สำหรับ Sheets API
+     */
+    buildUrl(sheetName, range = '') {
+        const fullRange = range ? `${sheetName}!${range}` : sheetName;
+        return `${this.baseUrl}/${this.spreadsheetId}/values/${fullRange}?key=${this.apiKey}`;
+    }
+
+    /**
+     * ดึงข้อมูลจากชีทเดียว
+     */
+    async fetchSheet(sheetName) {
+        try {
+            const url = this.buildUrl(sheetName);
+            console.log(`📥 Fetching ${sheetName}...`);
+            
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error(`Sheets API Error: ${response.status} ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (!data.values || data.values.length === 0) {
+                console.warn(`⚠️ ${sheetName} is empty`);
+                return { headers: [], rows: [] };
+            }
+            
+            const headers = data.values[0];
+            const rows = data.values.slice(1);
+            
+            console.log(`✅ ${sheetName}: ${rows.length} rows loaded`);
+            
+            return { headers, rows };
+            
+        } catch (error) {
+            console.error(`❌ Error fetching ${sheetName}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * ดึงข้อมูลจากหลายชีทพร้อมกัน (เร็วกว่า)
+     */
+    async fetchMultipleSheets(sheetNames) {
+        try {
+            // สร้าง ranges string สำหรับ batch request
+            const ranges = sheetNames.map(name => encodeURIComponent(name)).join('&ranges=');
+            const url = `${this.baseUrl}/${this.spreadsheetId}/values:batchGet?ranges=${ranges}&key=${this.apiKey}`;
+            
+            console.log(`📥 Batch fetching: ${sheetNames.join(', ')}...`);
+            
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error(`Sheets API Error: ${response.status} ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            // แปลงผลลัพธ์เป็น object
+            const result = {};
+            
+            data.valueRanges.forEach((valueRange, index) => {
+                const sheetName = sheetNames[index];
+                
+                if (!valueRange.values || valueRange.values.length === 0) {
+                    result[sheetName] = { headers: [], rows: [] };
+                    console.warn(`⚠️ ${sheetName} is empty`);
+                } else {
+                    result[sheetName] = {
+                        headers: valueRange.values[0],
+                        rows: valueRange.values.slice(1)
+                    };
+                    console.log(`✅ ${sheetName}: ${valueRange.values.length - 1} rows loaded`);
+                }
+            });
+            
+            return result;
+            
+        } catch (error) {
+            console.error(`❌ Error batch fetching sheets:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * โหลดข้อมูลทรัพย์สิน (Assets)
+     */
+    async loadAssets() {
+        const { headers, rows } = await this.fetchSheet(this.sheetNames.assets);
+        
+        if (rows.length === 0) {
+            return [];
+        }
+        
+        // แปลงเป็น object array
+        return rows.map(row => ({
+            code: row[0] || '',
+            name: row[1] || '',
+            category: row[2] || '',
+            brand: row[3] || '',
+            model: row[4] || '',
+            serial: row[5] || '',
+            purchaseDate: row[6] || '',
+            price: parseFloat(row[7]) || 0,
+            location: row[8] || '',
+            department: row[9] || '',
+            status: row[10] || 'สมบูรณ์',
+            description: row[11] || '',
+            lastUpdated: row[12] || ''
+        })).filter(asset => asset.code && asset.name);
+    }
+
+    /**
+     * โหลดข้อมูลสถานที่ (Locations)
+     */
+    async loadLocations() {
+        const { headers, rows } = await this.fetchSheet(this.sheetNames.locations);
+        
+        if (rows.length === 0) {
+            return [];
+        }
+        
+        return rows.map(row => ({
+            name: row[0] || '',
+            capacity: parseInt(row[1]) || 0,
+            currentCount: parseInt(row[2]) || 0,
+            custom: row[3] === 'ใช่',
+            lastUpdated: row[4] || ''
+        })).filter(loc => loc.name);
+    }
+
+    /**
+     * โหลดข้อมูลการนับสตอค (StockCount)
+     */
+    async loadStockCount() {
+        const { headers, rows } = await this.fetchSheet(this.sheetNames.stockCount);
+        
+        if (rows.length === 0) {
+            return { session: null, items: [] };
+        }
+        
+        const items = rows.map(row => ({
+            sessionId: row[0] || '',
+            countedDate: row[1] || '',
+            code: row[2] || '',
+            name: row[3] || '',
+            systemQty: parseInt(row[4]) || 0,
+            actualQty: parseInt(row[5]) || 0,
+            variance: parseInt(row[6]) || 0,
+            variancePercent: parseFloat(row[7]) || 0,
+            status: row[8] || '',
+            remark: row[9] || '',
+            countedBy: row[10] || ''
+        }));
+        
+        // หา session ล่าสุด
+        const lastItem = items[items.length - 1];
+        const session = lastItem ? {
+            id: lastItem.sessionId,
+            date: lastItem.countedDate
+        } : null;
+        
+        return { session, items };
+    }
+
+    /**
+     * โหลดประวัติการโอนย้าย (TransferHistory)
+     */
+    async loadTransferHistory() {
+        const { headers, rows } = await this.fetchSheet(this.sheetNames.transferHistory);
+        
+        if (rows.length === 0) {
+            return [];
+        }
+        
+        return rows.map(row => ({
+            date: row[0] || '',
+            assetCode: row[1] || '',
+            assetName: row[2] || '',
+            fromLocation: row[3] || '',
+            toLocation: row[4] || '',
+            fromDepartment: row[5] || '',
+            toDepartment: row[6] || '',
+            transferredBy: row[7] || '',
+            remark: row[8] || ''
+        }));
+    }
+
+    /**
+     * โหลดข้อมูลทั้งหมดพร้อมกัน (เร็วที่สุด)
+     */
+    async loadAllData() {
+        try {
+            console.log('🚀 Loading all sheets with Sheets API...');
+            const startTime = Date.now();
+            
+            // ใช้ batch request เพื่อโหลดทั้งหมดพร้อมกัน
+            const sheetsToLoad = [
+                this.sheetNames.assets,
+                this.sheetNames.locations,
+                this.sheetNames.stockCount,
+                this.sheetNames.transferHistory
+            ];
+            
+            const data = await this.fetchMultipleSheets(sheetsToLoad);
+            
+            // แปลงข้อมูลแต่ละชีท
+            const assets = this.parseAssets(data[this.sheetNames.assets]);
+            const locations = this.parseLocations(data[this.sheetNames.locations]);
+            const stockCount = this.parseStockCount(data[this.sheetNames.stockCount]);
+            const transferHistory = this.parseTransferHistory(data[this.sheetNames.transferHistory]);
+            
+            const endTime = Date.now();
+            const duration = ((endTime - startTime) / 1000).toFixed(2);
+            
+            console.log(`✅ All data loaded in ${duration} seconds`);
+            
+            return {
+                assets,
+                locations,
+                stockCount,
+                transferHistory,
+                loadTime: duration
+            };
+            
+        } catch (error) {
+            console.error('❌ Error loading all data:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * แปลงข้อมูล Assets
+     */
+    parseAssets({ headers, rows }) {
+        if (rows.length === 0) return [];
+        
+        return rows.map(row => ({
+            code: row[0] || '',
+            name: row[1] || '',
+            category: row[2] || '',
+            brand: row[3] || '',
+            model: row[4] || '',
+            serial: row[5] || '',
+            purchaseDate: row[6] || '',
+            price: parseFloat(row[7]) || 0,
+            location: row[8] || '',
+            department: row[9] || '',
+            status: row[10] || 'สมบูรณ์',
+            description: row[11] || '',
+            lastUpdated: row[12] || ''
+        })).filter(asset => asset.code && asset.name);
+    }
+
+    /**
+     * แปลงข้อมูล Locations
+     */
+    parseLocations({ headers, rows }) {
+        if (rows.length === 0) return [];
+        
+        return rows.map(row => ({
+            name: row[0] || '',
+            capacity: parseInt(row[1]) || 0,
+            currentCount: parseInt(row[2]) || 0,
+            custom: row[3] === 'ใช่',
+            lastUpdated: row[4] || ''
+        })).filter(loc => loc.name);
+    }
+
+    /**
+     * แปลงข้อมูล StockCount
+     */
+    parseStockCount({ headers, rows }) {
+        if (rows.length === 0) {
+            return { session: null, items: [] };
+        }
+        
+        const items = rows.map(row => ({
+            sessionId: row[0] || '',
+            countedDate: row[1] || '',
+            code: row[2] || '',
+            name: row[3] || '',
+            systemQty: parseInt(row[4]) || 0,
+            actualQty: parseInt(row[5]) || 0,
+            variance: parseInt(row[6]) || 0,
+            variancePercent: parseFloat(row[7]) || 0,
+            status: row[8] || '',
+            remark: row[9] || '',
+            countedBy: row[10] || ''
+        }));
+        
+        const lastItem = items[items.length - 1];
+        const session = lastItem ? {
+            id: lastItem.sessionId,
+            date: lastItem.countedDate
+        } : null;
+        
+        return { session, items };
+    }
+
+    /**
+     * แปลงข้อมูล TransferHistory
+     */
+    parseTransferHistory({ headers, rows }) {
+        if (rows.length === 0) return [];
+        
+        return rows.map(row => ({
+            date: row[0] || '',
+            assetCode: row[1] || '',
+            assetName: row[2] || '',
+            fromLocation: row[3] || '',
+            toLocation: row[4] || '',
+            fromDepartment: row[5] || '',
+            toDepartment: row[6] || '',
+            transferredBy: row[7] || '',
+            remark: row[8] || ''
+        }));
+    }
+
+    /**
+     * ตรวจสอบว่า API Key และ Spreadsheet ID ถูกต้อง
+     */
+    async validateConfig() {
+        try {
+            const url = `${this.baseUrl}/${this.spreadsheetId}?key=${this.apiKey}`;
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                return {
+                    valid: false,
+                    error: `API Error: ${response.status} ${response.statusText}`
+                };
+            }
+            
+            const data = await response.json();
+            
+            return {
+                valid: true,
+                title: data.properties.title,
+                sheets: data.sheets.map(s => s.properties.title)
+            };
+            
+        } catch (error) {
+            return {
+                valid: false,
+                error: error.message
+            };
+        }
+    }
+}
+
+// Export สำหรับใช้งานในไฟล์อื่น
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SheetsAPIHandler;
+}
+
+
+// ==================== Sheets Writer ====================
+/**
+ * FMCG Asset Management - Sheets Writer (Apps Script)
+ * จัดการการบันทึกข้อมูลทุกชีทผ่าน Google Apps Script
+ * Version: 4.0
+ * วันที่: 5 พฤศจิกายน 2568
+ */
+
+class SheetsWriter {
+    constructor(webAppUrl) {
+        this.webAppUrl = webAppUrl;
+    }
+
+    /**
+     * เรียก Apps Script ด้วย POST request
+     */
+    async callAppScript(action, data) {
+        try {
+            console.log(`📤 Calling Apps Script: ${action}`);
+            
+            const response = await fetch(this.webAppUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: action,
+                    data: data
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || 'Unknown error');
+            }
+            
+            console.log(`✅ ${action} completed successfully`);
+            return result;
+            
+        } catch (error) {
+            console.error(`❌ Error calling ${action}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * บันทึกข้อมูลทรัพย์สิน (Assets)
+     */
+    async saveAssets(assets) {
+        return await this.callAppScript('saveAssets', { assets });
+    }
+
+    /**
+     * บันทึกข้อมูลสถานที่ (Locations)
+     */
+    async saveLocations(locations) {
+        // แปลงเป็น array of arrays
+        const rows = locations.map(loc => [
+            loc.name,
+            loc.capacity || 0,
+            loc.currentCount || 0,
+            loc.custom ? 'ใช่' : 'ไม่',
+            loc.lastUpdated || new Date().toISOString()
+        ]);
+        
+        return await this.callAppScript('saveLocations', rows);
+    }
+
+    /**
+     * บันทึกสถานที่เดียว (Location)
+     */
+    async saveLocation(location) {
+        return await this.callAppScript('saveLocation', {
+            location: location.name,
+            capacity: location.capacity || 0,
+            custom: location.custom || false
+        });
+    }
+
+    /**
+     * บันทึกประวัติการโอนย้าย (TransferHistory)
+     */
+    async saveTransferHistory(transfer) {
+        return await this.callAppScript('saveTransferHistory', {
+            date: transfer.date || new Date().toISOString(),
+            assetCode: transfer.assetCode,
+            assetName: transfer.assetName,
+            fromLocation: transfer.fromLocation,
+            toLocation: transfer.toLocation,
+            fromDepartment: transfer.fromDepartment || '',
+            toDepartment: transfer.toDepartment || '',
+            transferredBy: transfer.transferredBy || 'System',
+            remark: transfer.remark || ''
+        });
+    }
+
+    /**
+     * บันทึกข้อมูลการนับสตอค (StockCount)
+     */
+    async saveStockCount(stockData, session) {
+        // แปลงเป็นรูปแบบที่ Apps Script ต้องการ
+        const formattedData = stockData.map(item => ({
+            sessionId: session.id,
+            countedDate: item.countedDate || new Date().toISOString(),
+            code: item.code,
+            name: item.name,
+            systemQty: item.systemQty,
+            actualQty: item.actualQty,
+            variance: item.variance,
+            variancePercent: item.variancePercent,
+            status: item.status,
+            remark: item.remark || '',
+            countedBy: item.countedBy || 'System'
+        }));
+        
+        return await this.callAppScript('saveStockCount', {
+            data: formattedData,
+            session: session
+        });
+    }
+
+    /**
+     * เพิ่มทรัพย์สิน (Append)
+     */
+    async appendAssets(assets) {
+        const rows = assets.map(asset => [
+            asset.code,
+            asset.name,
+            asset.category,
+            asset.brand || '',
+            asset.model || '',
+            asset.serial || '',
+            asset.purchaseDate || '',
+            asset.price || 0,
+            asset.location,
+            asset.department || '',
+            asset.status || 'สมบูรณ์',
+            asset.description || '',
+            asset.lastUpdated || new Date().toISOString()
+        ]);
+        
+        return await this.callAppScript('append', { rows });
+    }
+
+    /**
+     * สร้างชีทใหม่ทั้งหมด (Initialize)
+     */
+    async initializeSheets() {
+        return await this.callAppScript('initialize', {});
+    }
+
+    /**
+     * อัพเดททรัพย์สินเดียว
+     */
+    async updateSingleAsset(asset) {
+        // ใช้การบันทึกทั้งหมดแทน (เพราะ Apps Script ไม่มีฟังก์ชันอัพเดทแถวเดียว)
+        // ต้องโหลดข้อมูลทั้งหมด แก้ไข แล้วบันทึกกลับ
+        console.warn('⚠️ updateSingleAsset requires full reload - use saveAssets instead');
+        throw new Error('Use saveAssets for updating data');
+    }
+
+    /**
+     * ลบทรัพย์สิน
+     */
+    async deleteAsset(assetCode) {
+        // ต้องโหลดข้อมูลทั้งหมด ลบ แล้วบันทึกกลับ
+        console.warn('⚠️ deleteAsset requires full reload');
+        throw new Error('Delete by reloading and filtering, then save with saveAssets');
+    }
+
+    /**
+     * ตรวจสอบการเชื่อมต่อ Apps Script
+     */
+    async testConnection() {
+        try {
+            const response = await fetch(this.webAppUrl + '?action=getAssets', {
+                method: 'GET'
+            });
+            
+            if (!response.ok) {
+                return {
+                    connected: false,
+                    error: `HTTP ${response.status}`
+                };
+            }
+            
+            const data = await response.json();
+            
+            return {
+                connected: data.success,
+                message: data.success ? 'Connected' : 'Failed'
+            };
+            
+        } catch (error) {
+            return {
+                connected: false,
+                error: error.message
+            };
+        }
+    }
+}
+
+// Export
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SheetsWriter;
+}
+
+
+// ==================== Data Sync Manager ====================
+/**
+ * FMCG Asset Management - Data Sync Manager
+ * ตัวจัดการหลักสำหรับ sync ข้อมูลระหว่าง Sheets API และ Apps Script
+ * Version: 4.0
+ * วันที่: 5 พฤศจิกายน 2568
+ */
+
+class DataSyncManager {
+    constructor(config) {
+        this.config = config;
+        
+        // สร้าง handler สำหรับอ่านและเขียน
+        this.reader = new SheetsAPIHandler(
+            config.sheetsApiKey,
+            config.spreadsheetId
+        );
+        
+        this.writer = new SheetsWriter(config.appsScriptUrl);
+        
+        // Cache
+        this.cache = {
+            assets: [],
+            locations: [],
+            stockCount: { session: null, items: [] },
+            transferHistory: [],
+            lastSync: null
+        };
+        
+        // สถานะ
+        this.syncing = false;
+        this.autoSyncInterval = null;
+    }
+
+    /**
+     * โหลดข้อมูลทั้งหมด (Fast Load with Sheets API)
+     */
+    async loadAll() {
+        if (this.syncing) {
+            console.warn('⚠️ Sync already in progress');
+            return this.cache;
+        }
+        
+        try {
+            this.syncing = true;
+            console.log('🔄 Starting full data sync...');
+            
+            const data = await this.reader.loadAllData();
+            
+            // อัพเดท cache
+            this.cache.assets = data.assets;
+            this.cache.locations = data.locations;
+            this.cache.stockCount = data.stockCount;
+            this.cache.transferHistory = data.transferHistory;
+            this.cache.lastSync = new Date();
+            
+            console.log(`✅ Full sync completed in ${data.loadTime}s`);
+            console.log(`📦 Assets: ${data.assets.length}`);
+            console.log(`📍 Locations: ${data.locations.length}`);
+            console.log(`📊 Stock Count: ${data.stockCount.items.length}`);
+            console.log(`🔄 Transfer History: ${data.transferHistory.length}`);
+            
+            return this.cache;
+            
+        } catch (error) {
+            console.error('❌ Full sync failed:', error);
+            throw error;
+        } finally {
+            this.syncing = false;
+        }
+    }
+
+    /**
+     * โหลดเฉพาะทรัพย์สิน
+     */
+    async loadAssets() {
+        try {
+            console.log('📥 Loading assets...');
+            const assets = await this.reader.loadAssets();
+            this.cache.assets = assets;
+            console.log(`✅ Loaded ${assets.length} assets`);
+            return assets;
+        } catch (error) {
+            console.error('❌ Failed to load assets:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * โหลดเฉพาะสถานที่
+     */
+    async loadLocations() {
+        try {
+            console.log('📥 Loading locations...');
+            const locations = await this.reader.loadLocations();
+            this.cache.locations = locations;
+            console.log(`✅ Loaded ${locations.length} locations`);
+            return locations;
+        } catch (error) {
+            console.error('❌ Failed to load locations:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * โหลดเฉพาะการนับสตอค
+     */
+    async loadStockCount() {
+        try {
+            console.log('📥 Loading stock count...');
+            const stockCount = await this.reader.loadStockCount();
+            this.cache.stockCount = stockCount;
+            console.log(`✅ Loaded ${stockCount.items.length} stock count items`);
+            return stockCount;
+        } catch (error) {
+            console.error('❌ Failed to load stock count:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * โหลดเฉพาะประวัติการโอนย้าย
+     */
+    async loadTransferHistory() {
+        try {
+            console.log('📥 Loading transfer history...');
+            const history = await this.reader.loadTransferHistory();
+            this.cache.transferHistory = history;
+            console.log(`✅ Loaded ${history.length} transfer records`);
+            return history;
+        } catch (error) {
+            console.error('❌ Failed to load transfer history:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * บันทึกทรัพย์สิน
+     */
+    async saveAssets(assets) {
+        try {
+            console.log(`💾 Saving ${assets.length} assets...`);
+            const result = await this.writer.saveAssets(assets);
+            this.cache.assets = assets;
+            console.log('✅ Assets saved successfully');
+            return result;
+        } catch (error) {
+            console.error('❌ Failed to save assets:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * บันทึกสถานที่
+     */
+    async saveLocations(locations) {
+        try {
+            console.log(`💾 Saving ${locations.length} locations...`);
+            const result = await this.writer.saveLocations(locations);
+            this.cache.locations = locations;
+            console.log('✅ Locations saved successfully');
+            return result;
+        } catch (error) {
+            console.error('❌ Failed to save locations:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * บันทึกประวัติการโอนย้าย
+     */
+    async saveTransferHistory(transfer) {
+        try {
+            console.log('💾 Saving transfer history...');
+            const result = await this.writer.saveTransferHistory(transfer);
+            
+            // อัพเดท cache
+            this.cache.transferHistory.push(transfer);
+            
+            console.log('✅ Transfer history saved');
+            return result;
+        } catch (error) {
+            console.error('❌ Failed to save transfer history:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * บันทึกการนับสตอค
+     */
+    async saveStockCount(stockData, session) {
+        try {
+            console.log(`💾 Saving stock count (${stockData.length} items)...`);
+            const result = await this.writer.saveStockCount(stockData, session);
+            
+            // อัพเดท cache
+            this.cache.stockCount = {
+                session: session,
+                items: stockData
+            };
+            
+            console.log('✅ Stock count saved');
+            return result;
+        } catch (error) {
+            console.error('❌ Failed to save stock count:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * เพิ่มทรัพย์สินใหม่
+     */
+    async addAsset(asset) {
+        try {
+            console.log('💾 Adding new asset...');
+            const result = await this.writer.appendAssets([asset]);
+            
+            // อัพเดท cache
+            this.cache.assets.push(asset);
+            
+            console.log('✅ Asset added');
+            return result;
+        } catch (error) {
+            console.error('❌ Failed to add asset:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * อัพเดททรัพย์สิน (ต้อง reload ทั้งหมด)
+     */
+    async updateAsset(updatedAsset) {
+        try {
+            // หาและแทนที่ใน cache
+            const index = this.cache.assets.findIndex(a => a.code === updatedAsset.code);
+            
+            if (index === -1) {
+                throw new Error('Asset not found in cache');
+            }
+            
+            this.cache.assets[index] = updatedAsset;
+            
+            // บันทึกทั้งหมด
+            const result = await this.saveAssets(this.cache.assets);
+            
+            console.log('✅ Asset updated');
+            return result;
+        } catch (error) {
+            console.error('❌ Failed to update asset:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * ลบทรัพย์สิน
+     */
+    async deleteAsset(assetCode) {
+        try {
+            // ลบออกจาก cache
+            this.cache.assets = this.cache.assets.filter(a => a.code !== assetCode);
+            
+            // บันทึกทั้งหมด
+            const result = await this.saveAssets(this.cache.assets);
+            
+            console.log('✅ Asset deleted');
+            return result;
+        } catch (error) {
+            console.error('❌ Failed to delete asset:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * โหลดข้อมูลจาก cache (ไม่เรียก API)
+     */
+    getCached() {
+        return {
+            ...this.cache,
+            isCached: true,
+            lastSync: this.cache.lastSync
+        };
+    }
+
+    /**
+     * ล้าง cache
+     */
+    clearCache() {
+        this.cache = {
+            assets: [],
+            locations: [],
+            stockCount: { session: null, items: [] },
+            transferHistory: [],
+            lastSync: null
+        };
+        console.log('🗑️ Cache cleared');
+    }
+
+    /**
+     * เปิดใช้งาน Auto Sync
+     */
+    enableAutoSync(intervalMinutes = 5) {
+        if (this.autoSyncInterval) {
+            console.warn('⚠️ Auto sync already enabled');
+            return;
+        }
+        
+        const intervalMs = intervalMinutes * 60 * 1000;
+        
+        this.autoSyncInterval = setInterval(async () => {
+            console.log('🔄 Auto sync triggered...');
+            try {
+                await this.loadAll();
+            } catch (error) {
+                console.error('❌ Auto sync failed:', error);
+            }
+        }, intervalMs);
+        
+        console.log(`✅ Auto sync enabled (every ${intervalMinutes} minutes)`);
+    }
+
+    /**
+     * ปิด Auto Sync
+     */
+    disableAutoSync() {
+        if (this.autoSyncInterval) {
+            clearInterval(this.autoSyncInterval);
+            this.autoSyncInterval = null;
+            console.log('🛑 Auto sync disabled');
+        }
+    }
+
+    /**
+     * ตรวจสอบการเชื่อมต่อ
+     */
+    async testConnection() {
+        try {
+            console.log('🔍 Testing connections...');
+            
+            // ทดสอบ Sheets API
+            const apiTest = await this.reader.validateConfig();
+            
+            // ทดสอบ Apps Script
+            const scriptTest = await this.writer.testConnection();
+            
+            return {
+                sheetsApi: apiTest,
+                appsScript: scriptTest,
+                overall: apiTest.valid && scriptTest.connected
+            };
+            
+        } catch (error) {
+            console.error('❌ Connection test failed:', error);
+            return {
+                sheetsApi: { valid: false, error: error.message },
+                appsScript: { connected: false, error: error.message },
+                overall: false
+            };
+        }
+    }
+
+    /**
+     * รีเซ็ตชีททั้งหมด
+     */
+    async resetSheets() {
+        try {
+            console.log('🔄 Resetting all sheets...');
+            const result = await this.writer.initializeSheets();
+            this.clearCache();
+            console.log('✅ All sheets reset');
+            return result;
+        } catch (error) {
+            console.error('❌ Failed to reset sheets:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * สรุปสถานะ
+     */
+    getStatus() {
+        return {
+            syncing: this.syncing,
+            autoSync: !!this.autoSyncInterval,
+            lastSync: this.cache.lastSync,
+            cacheSize: {
+                assets: this.cache.assets.length,
+                locations: this.cache.locations.length,
+                stockCount: this.cache.stockCount.items.length,
+                transferHistory: this.cache.transferHistory.length
+            }
+        };
+    }
+}
+
+// Export
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = DataSyncManager;
+}
+
+
+    </script>
+    <script src="print.js"></script>
+    <script src="scanner.js"></script>
     <style>
         * {
             margin: 0;
@@ -2795,6 +3795,13 @@
         // Global Variables
         let assetsData = [];
         let importData = [];
+        let locationsData = [];
+        let stockCountData = [];
+        let transferHistoryData = [];
+        let currentStockSession = null;
+        
+        // ⚡ NEW: Data Sync Manager Instance
+        let syncManager = null;
         
         // ========================================
         // ⚙️ การตั้งค่า Google Apps Script URL
@@ -2827,6 +3834,36 @@
             webAppUrl: GOOGLE_APPS_SCRIPT_URL,
             sheetName: 'Assets'
         };
+
+        // ========================================
+        // 🚀 Initialize Sync Manager
+        // ========================================
+        function initializeSyncManager() {
+            if (syncManager) {
+                console.log('✅ Sync Manager already initialized');
+                return;
+            }
+            
+            try {
+                syncManager = new DataSyncManager({
+                    sheetsApiKey: SHEETS_API_KEY,
+                    spreadsheetId: SPREADSHEET_ID,
+                    appsScriptUrl: GOOGLE_APPS_SCRIPT_URL
+                });
+                
+                console.log('✅ Sync Manager initialized successfully');
+                console.log('📊 Config:', {
+                    apiKey: SHEETS_API_KEY ? 'Set' : 'Not Set',
+                    spreadsheetId: SPREADSHEET_ID ? 'Set' : 'Not Set',
+                    appsScriptUrl: GOOGLE_APPS_SCRIPT_URL ? 'Set' : 'Not Set'
+                });
+                
+                return true;
+            } catch (error) {
+                console.error('❌ Failed to initialize Sync Manager:', error);
+                return false;
+            }
+        }
 
         // Toggle Sidebar
         function toggleSidebar() {
@@ -5937,83 +6974,209 @@
             }
         }
 
-        // ⚡ Load Data from Google Sheets API (เร็วกว่า Apps Script)
+        // ⚡ NEW: Load Data from Sheets API (Using Sync Manager)
         async function loadFromSheetsAPI() {
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}?key=${SHEETS_API_KEY}`;
-            
-            const response = await fetch(url);
-            
-            if (!response.ok) {
-                throw new Error('Sheets API Error: ' + response.status);
-            }
-            
-            const data = await response.json();
-            
-            if (!data.values || data.values.length <= 1) {
+            try {
+                // เริ่มต้น Sync Manager ถ้ายังไม่มี
+                if (!syncManager) {
+                    initializeSyncManager();
+                }
+                
+                if (!syncManager) {
+                    throw new Error('ไม่สามารถเริ่มต้น Sync Manager ได้');
+                }
+                
+                console.log('🔄 Loading all data with Sheets API...');
+                
+                // โหลดข้อมูลทั้งหมดพร้อมกัน (เร็ว!)
+                const data = await syncManager.loadAll();
+                
+                // อัพเดทข้อมูล
+                assetsData = data.assets;
+                locationsData = data.locations;
+                stockCountData = data.stockCount.items;
+                transferHistoryData = data.transferHistory;
+                currentStockSession = data.stockCount.session;
+                
                 hideLoading();
-                showNotification('⚠️ ไม่พบข้อมูลใน Google Sheets', 'warning');
-                return;
+                showNotification(`⚡ โหลดข้อมูลสำเร็จใน ${data.loadTime}s! (Assets: ${data.assets.length}, Locations: ${data.locations.length})`, 'success');
+                
+                // อัพเดท UI
+                updateDashboard();
+                renderAssetsTable();
+                
+                // อัพเดท UI อื่นๆ ถ้ามี
+                if (typeof updateLocationsUI === 'function') updateLocationsUI();
+                if (typeof updateStockCountPage === 'function') updateStockCountPage();
+                if (typeof renderHistoryTable === 'function') renderHistoryTable();
+                
+                console.log('✅ All data loaded successfully');
+                
+            } catch (error) {
+                console.error('❌ Load error:', error);
+                throw error;
             }
-            
-            // แปลงข้อมูลจาก Sheets API
-            const loadedAssets = data.values.slice(1).map(row => ({
-                code: row[0] || '',
-                name: row[1] || '',
-                category: row[2] || '',
-                brand: row[3] || '',
-                model: row[4] || '',
-                serial: row[5] || '',
-                purchaseDate: row[6] || '',
-                price: row[7] || 0,
-                location: row[8] || '',
-                department: row[9] || '',
-                status: row[10] || 'สมบูรณ์',
-                description: row[11] || '',
-                createdAt: row[12] || new Date().toISOString()
-            })).filter(asset => asset.code && asset.name);
-            
-            assetsData = loadedAssets;
-            
-            hideLoading();
-            showNotification(`⚡ โหลดข้อมูล ${loadedAssets.length} รายการสำเร็จ! (Sheets API - เร็ว)`, 'success');
-            
-            updateDashboard();
-            renderAssetsTable();
         }
 
-        // Save to Google Sheets
+        // ⚡ NEW: Save to Google Sheets (Using Sync Manager)
         async function saveToGoogleSheets(assets) {
-            const webAppUrl = sheetsConfig.webAppUrl || GOOGLE_APPS_SCRIPT_URL;
-            
-            if (!webAppUrl) {
-                throw new Error('กรุณาตั้งค่า Web App URL ในหน้าตั้งค่าระบบ');
+            try {
+                // เริ่มต้น Sync Manager ถ้ายังไม่มี
+                if (!syncManager) {
+                    initializeSyncManager();
+                }
+                
+                if (!syncManager) {
+                    throw new Error('ไม่สามารถเริ่มต้น Sync Manager ได้');
+                }
+                
+                console.log(`💾 Saving ${assets.length} assets...`);
+                
+                // บันทึกข้อมูล
+                const result = await syncManager.saveAssets(assets);
+                
+                // อัพเดท cache
+                assetsData = assets;
+                
+                console.log('✅ Assets saved successfully');
+                
+                return result;
+                
+            } catch (error) {
+                console.error('❌ Save error:', error);
+                throw error;
             }
-            
-            const rows = assets.map(asset => [
-                asset.code, asset.name, asset.category, asset.brand, asset.model,
-                asset.serial, asset.purchaseDate, asset.price, asset.location,
-                asset.department || '', asset.status, asset.description, asset.createdAt
-            ]);
-            
-            const response = await fetch(webAppUrl, {
-                method: 'POST',
-                body: JSON.stringify({
-                    action: 'append',
-                    rows: rows
-                })
-            });
-            
-            if (!response.ok) {
-                throw new Error('ไม่สามารถบันทึกข้อมูลได้');
+        }
+
+
+        // ========================================
+        // 🆕 NEW FUNCTIONS: Locations, StockCount, TransferHistory
+        // ========================================
+        
+        // โหลดสถานที่
+        async function loadLocationsFromSheets() {
+            try {
+                if (!syncManager) initializeSyncManager();
+                
+                console.log('📍 Loading locations...');
+                const locations = await syncManager.loadLocations();
+                locationsData = locations;
+                
+                console.log(`✅ Loaded ${locations.length} locations`);
+                
+                // อัพเดท UI ถ้ามี
+                if (typeof updateLocationsUI === 'function') {
+                    updateLocationsUI();
+                }
+                
+                return locations;
+            } catch (error) {
+                console.error('❌ Error loading locations:', error);
+                throw error;
             }
-            
-            const result = await response.json();
-            
-            if (!result.success) {
-                throw new Error(result.error || 'เกิดข้อผิดพลาดในการบันทึก');
+        }
+        
+        // บันทึกสถานที่
+        async function saveLocationsToSheets(locations) {
+            try {
+                if (!syncManager) initializeSyncManager();
+                
+                console.log(`💾 Saving ${locations.length} locations...`);
+                const result = await syncManager.saveLocations(locations);
+                locationsData = locations;
+                
+                console.log('✅ Locations saved');
+                return result;
+            } catch (error) {
+                console.error('❌ Error saving locations:', error);
+                throw error;
             }
-            
-            return result;
+        }
+        
+        // โหลด Stock Count
+        async function loadStockCountFromSheets() {
+            try {
+                if (!syncManager) initializeSyncManager();
+                
+                console.log('📊 Loading stock count...');
+                const stockCount = await syncManager.loadStockCount();
+                
+                stockCountData = stockCount.items;
+                currentStockSession = stockCount.session;
+                
+                console.log(`✅ Loaded ${stockCount.items.length} stock count items`);
+                
+                // อัพเดท UI ถ้ามี
+                if (typeof updateStockCountPage === 'function') {
+                    updateStockCountPage();
+                }
+                
+                return stockCount;
+            } catch (error) {
+                console.error('❌ Error loading stock count:', error);
+                throw error;
+            }
+        }
+        
+        // บันทึก Stock Count
+        async function saveStockCountToSheets(stockData, session) {
+            try {
+                if (!syncManager) initializeSyncManager();
+                
+                console.log(`💾 Saving stock count (${stockData.length} items)...`);
+                const result = await syncManager.saveStockCount(stockData, session);
+                
+                stockCountData = stockData;
+                currentStockSession = session;
+                
+                console.log('✅ Stock count saved');
+                return result;
+            } catch (error) {
+                console.error('❌ Error saving stock count:', error);
+                throw error;
+            }
+        }
+        
+        // โหลดประวัติการโอนย้าย
+        async function loadTransferHistoryFromSheets() {
+            try {
+                if (!syncManager) initializeSyncManager();
+                
+                console.log('🔄 Loading transfer history...');
+                const history = await syncManager.loadTransferHistory();
+                transferHistoryData = history;
+                
+                console.log(`✅ Loaded ${history.length} transfer records`);
+                
+                // อัพเดท UI ถ้ามี
+                if (typeof renderHistoryTable === 'function') {
+                    renderHistoryTable();
+                }
+                
+                return history;
+            } catch (error) {
+                console.error('❌ Error loading transfer history:', error);
+                throw error;
+            }
+        }
+        
+        // บันทึกประวัติการโอนย้าย
+        async function saveTransferHistoryToSheets(transfer) {
+            try {
+                if (!syncManager) initializeSyncManager();
+                
+                console.log('💾 Saving transfer history...');
+                const result = await syncManager.saveTransferHistory(transfer);
+                
+                // เพิ่มเข้า array
+                transferHistoryData.push(transfer);
+                
+                console.log('✅ Transfer history saved');
+                return result;
+            } catch (error) {
+                console.error('❌ Error saving transfer history:', error);
+                throw error;
+            }
         }
 
         // Initialize Google Sheets with Headers
@@ -6509,8 +7672,6 @@
         }
 
         // ==================== Stock Count Functions ====================
-        let stockCountData = [];
-        let currentStockSession = null;
 
         // Start Stock Count
         function startStockCount() {
