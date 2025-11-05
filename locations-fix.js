@@ -40,29 +40,24 @@ function formatThaiDateTime(date) {
 
 /**
  * อัพเดทหน้า Locations Page
- * โหลดข้อมูลจาก Google Sheets อัตโนมัติ
+ * โหลดข้อมูลจาก Google Sheets อัตโนมัติและแสดงเฉพาะข้อมูลจาก Sheet
  */
 async function updateLocationsPage() {
     // โหลดข้อมูลจาก Google Sheets อัตโนมัติแบบ silent
     if (typeof loadLocationsFromSheets === 'function') {
-        await loadLocationsFromSheets(true); // silent mode
+        const loaded = await loadLocationsFromSheets(true); // silent mode
+        
+        if (!loaded) {
+            console.log('⚠️ ไม่สามารถโหลดจาก Sheets ได้ ใช้ข้อมูล localStorage แทน');
+        }
     }
     
-    if (assetsData.length === 0) {
-        const tbody = document.getElementById('locationsTableBody');
-        if (tbody) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="7" style="text-align: center; color: #aaa; padding: 40px;">
-                        ยังไม่มีข้อมูลทรัพย์สิน
-                    </td>
-                </tr>
-            `;
-        }
-        return;
-    }
-
-    // รวมทั้งสถานที่จาก assetsData และ customLocations
+    // ใช้ข้อมูลจาก locationCapacity และ customLocations ที่โหลดจาก Sheets
+    const tbody = document.getElementById('locationsTableBody');
+    
+    if (!tbody) return;
+    
+    // รวมสถานที่จาก assetsData และ customLocations (จาก Sheets)
     const locationData = {};
     
     // เพิ่มสถานที่จาก assetsData
@@ -80,18 +75,8 @@ async function updateLocationsPage() {
         }
     });
     
-    // เพิ่มสถานที่จาก customLocations ที่ยังไม่มีในรายการ
-    if (typeof getAllLocations === 'function') {
-        const allLocations = getAllLocations();
-        allLocations.forEach(loc => {
-            if (!locationData[loc]) {
-                locationData[loc] = {
-                    total: 0,
-                    complete: 0
-                };
-            }
-        });
-    } else if (typeof customLocations !== 'undefined' && Array.isArray(customLocations)) {
+    // เพิ่มสถานที่จาก customLocations (จาก Sheets) ที่ยังไม่มีในรายการ
+    if (typeof customLocations !== 'undefined' && Array.isArray(customLocations)) {
         customLocations.forEach(locObj => {
             const loc = locObj.name;
             if (!locationData[loc]) {
@@ -101,6 +86,28 @@ async function updateLocationsPage() {
                 };
             }
         });
+    }
+
+    // ถ้าไม่มีข้อมูลเลย
+    if (Object.keys(locationData).length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align: center; color: #aaa; padding: 40px;">
+                    ยังไม่มีข้อมูลสถานที่เก็บ
+                    <br><br>
+                    <button class="btn btn-success" onclick="openAddLocationModal()">
+                        <i class="fas fa-plus"></i> เพิ่มสถานที่แรก
+                    </button>
+                </td>
+            </tr>
+        `;
+        
+        // อัพเดท stats เป็น 0
+        document.getElementById('totalLocations').textContent = '0';
+        document.getElementById('avgCapacity').textContent = '0%';
+        document.getElementById('totalAssetsInLocations').textContent = '0';
+        document.getElementById('fullLocations').textContent = '0';
+        return;
     }
 
     // Calculate totals
@@ -133,76 +140,75 @@ async function updateLocationsPage() {
     document.getElementById('fullLocations').textContent = fullLocationsCount;
 
     // Update location table
-    const tbody = document.getElementById('locationsTableBody');
-    if (tbody) {
-        const sortedLocations = Object.entries(locationData).sort((a, b) => {
-            if (a[0] === 'ไม่ระบุ') return 1;
-            if (b[0] === 'ไม่ระบุ') return -1;
-            return a[0].localeCompare(b[0], 'th');
-        });
+    const sortedLocations = Object.entries(locationData).sort((a, b) => {
+        if (a[0] === 'ไม่ระบุ') return 1;
+        if (b[0] === 'ไม่ระบุ') return -1;
+        return a[0].localeCompare(b[0], 'th');
+    });
+    
+    tbody.innerHTML = sortedLocations.map(([location, data]) => {
+        const maxCap = locationCapacity[location] || 0;
+        const usagePercent = maxCap > 0 && data.total > 0 ? (data.total / maxCap) * 100 : 0;
         
-        tbody.innerHTML = sortedLocations.map(([location, data]) => {
-            const maxCap = locationCapacity[location] || 0;
-            const usagePercent = maxCap > 0 && data.total > 0 ? (data.total / maxCap) * 100 : 0;
-            
-            let statusClass, statusText;
-            if (maxCap === 0) {
-                statusClass = 'available';
-                statusText = 'ไม่กำหนด';
-            } else if (data.total === 0) {
-                statusClass = 'complete';
-                statusText = 'ว่าง';
-            } else if (usagePercent >= 90) {
-                statusClass = 'broken';
-                statusText = 'เต็ม (>90%)';
-            } else if (usagePercent >= 70) {
-                statusClass = 'maintenance';
-                statusText = 'เตือน (70-90%)';
-            } else {
-                statusClass = 'complete';
-                statusText = 'ปกติ (<70%)';
-            }
-            
-            const progressBarWidth = maxCap > 0 && data.total > 0 ? Math.min(usagePercent, 100) : 0;
-            const progressBarColor = usagePercent >= 90 ? '#ef4444' : usagePercent >= 70 ? '#f59e0b' : '#10b981';
-            const isEmptyLocation = data.total === 0;
-            
-            return `
-                <tr ${isEmptyLocation ? 'style="background: #f9fafb;"' : ''}>
-                    <td>
-                        <strong>${location}</strong>
-                        ${isEmptyLocation ? '<span style="color: #999; font-size: 12px; margin-left: 8px;">(ว่าง)</span>' : ''}
-                    </td>
-                    <td>-</td>
-                    <td style="text-align: center; font-weight: 600; ${isEmptyLocation ? 'color: #999;' : ''}">
-                        ${data.total}
-                    </td>
-                    <td style="text-align: center;">
-                        ${maxCap > 0 ? maxCap : '<span style="color: #999;">-</span>'}
-                    </td>
-                    <td>
-                        ${maxCap > 0 && data.total > 0 ? `
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <div style="flex: 1; background: #e5e5e5; border-radius: 10px; height: 20px; overflow: hidden;">
-                                    <div style="background: ${progressBarColor}; width: ${progressBarWidth}%; height: 100%; 
-                                                display: flex; align-items: center; justify-content: center; 
-                                                color: white; font-size: 11px; font-weight: 600; transition: all 0.3s;">
-                                        ${usagePercent.toFixed(1)}%
-                                    </div>
+        let statusClass, statusText;
+        if (maxCap === 0) {
+            statusClass = 'available';
+            statusText = 'ไม่กำหนด';
+        } else if (data.total === 0) {
+            statusClass = 'complete';
+            statusText = 'ว่าง';
+        } else if (usagePercent >= 90) {
+            statusClass = 'broken';
+            statusText = 'เต็ม (>90%)';
+        } else if (usagePercent >= 70) {
+            statusClass = 'maintenance';
+            statusText = 'เตือน (70-90%)';
+        } else {
+            statusClass = 'complete';
+            statusText = 'ปกติ (<70%)';
+        }
+        
+        const progressBarWidth = maxCap > 0 && data.total > 0 ? Math.min(usagePercent, 100) : 0;
+        const progressBarColor = usagePercent >= 90 ? '#ef4444' : usagePercent >= 70 ? '#f59e0b' : '#10b981';
+        const isEmptyLocation = data.total === 0;
+        
+        return `
+            <tr ${isEmptyLocation ? 'style="background: #f9fafb;"' : ''}>
+                <td>
+                    <strong>${location}</strong>
+                    ${isEmptyLocation ? '<span style="color: #999; font-size: 12px; margin-left: 8px;">(ว่าง)</span>' : ''}
+                </td>
+                <td>-</td>
+                <td style="text-align: center; font-weight: 600; ${isEmptyLocation ? 'color: #999;' : ''}">
+                    ${data.total}
+                </td>
+                <td style="text-align: center;">
+                    ${maxCap > 0 ? maxCap : '<span style="color: #999;">-</span>'}
+                </td>
+                <td>
+                    ${maxCap > 0 && data.total > 0 ? `
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="flex: 1; background: #e5e5e5; border-radius: 10px; height: 20px; overflow: hidden;">
+                                <div style="background: ${progressBarColor}; width: ${progressBarWidth}%; height: 100%; 
+                                            display: flex; align-items: center; justify-content: center; 
+                                            color: white; font-size: 11px; font-weight: 600; transition: all 0.3s;">
+                                    ${usagePercent.toFixed(1)}%
                                 </div>
                             </div>
-                        ` : '<span style="color: #999;">-</span>'}
-                    </td>
-                    <td><span class="badge ${statusClass}">${statusText}</span></td>
-                    <td style="text-align: center;">
-                        <button class="action-btn primary" onclick="editCapacity('${location}', ${data.total})" title="แก้ไขความจุ">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
-        }).join('');
-    }
+                        </div>
+                    ` : '<span style="color: #999;">-</span>'}
+                </td>
+                <td><span class="badge ${statusClass}">${statusText}</span></td>
+                <td style="text-align: center;">
+                    <button class="action-btn primary" onclick="editCapacity('${location}', ${data.total})" title="แก้ไขความจุ">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    console.log('✅ แสดงข้อมูล', totalLocations, 'สถานที่จาก Google Sheets');
 }
 
 /**
